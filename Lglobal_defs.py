@@ -6,55 +6,35 @@
 """
 
 import os
+from enum import IntEnum
 
 
-NUM_TOTAL_ANIMALS = 50
-NUM_TOTAL_FEATURES = 85
+def mk_dir(name):
+    if not os.path.exists(name):
+        os.mkdir(name)
+    return name
 
 
 # top directories
-PATH_BASE_FOLDER = 'Animals_with_Attributes2'
-PATH_FEATURES_FOLDER = 'Features/ResNet101'
-PATH_IMAGES_FOLDER = 'Animals_with_Attributes2/JPEGImages'
+PATH_RESNET50_FOLDER = '../Office-Home_resnet50'
 
 
-# 50 rows: [class_number class_name]
-PATH_CLASSES = os.path.join(PATH_BASE_FOLDER, 'classes.txt')
-# 50 rows: [0 1 0 1 0 1 0 0 0 0 1 ...]
-PATH_PREDICATE_MATRIX_BINARY = os.path.join(PATH_BASE_FOLDER, 'predicate-matrix-binary.txt')
-# 50 rows: [10.2 0.33 0.2 60.1 -1.2 ...]
-PATH_PREDICATE_MATRIX_CONTINUOUS = os.path.join(PATH_BASE_FOLDER, 'predicate-matrix-continuous.txt')
-# 85 rows: [feature_number feature_name]
-PATH_PREDICATES = os.path.join(PATH_BASE_FOLDER, 'predicates.txt')
+PATH_SAVING = mk_dir('Lsaving')
+PATH_MNIST = os.path.join(PATH_SAVING, 'MNIST_data')
+PATH_RAW_DL_FEATURES = mk_dir(os.path.join(PATH_SAVING, 'raw_dls'))
 
 
-# 700+M, float numbers
-PATH_FEATURES = os.path.join(PATH_FEATURES_FOLDER, 'AwA2-features.txt')
-# many rows, [horse_11222.jpg]
-PATH_FILENAMES = os.path.join(PATH_FEATURES_FOLDER, 'AwA2-filenames.txt')
-# many rows, (same as FILENAMES), [1/0]
-PATH_LABELS = os.path.join(PATH_FEATURES_FOLDER, 'AwA2-labels.txt')
-
-
-PATH_RESULTS_FOLDER = 'results'
-if not os.path.exists(PATH_RESULTS_FOLDER):
-    os.mkdir(PATH_RESULTS_FOLDER)
-PATH_RESULT_BOWED_FEATURES = os.path.join(PATH_RESULTS_FOLDER, 'bowed_feature')
-PATH_RESULT_BOWED_CV_FEATURES = os.path.join(PATH_RESULTS_FOLDER, 'bowed_feature_cv')
-PATH_RESULT_SIFT_FEATURE = os.path.join(PATH_RESULTS_FOLDER,'sifted')
-PATH_RESULT_SIFT_PCA_FEATURE = os.path.join(PATH_RESULTS_FOLDER,'sifted_pca')
-PATH_RESULT_SIFT_LABELS = os.path.join(PATH_RESULTS_FOLDER, 'sift_labels')
-
-
-PATH_SAVING_FOLDER = 'saving'
-if not os.path.exists(PATH_SAVING_FOLDER):
-    os.mkdir(PATH_SAVING_FOLDER)
-PATH_SAVING_DICTS = os.path.join(PATH_SAVING_FOLDER, 'dicts')
-PATH_SAVING_MINIKMEANS_CLUSTERER = os.path.join(PATH_SAVING_FOLDER, 'mini_kmeans')
-PATH_SAVING_LIST_SIFT = os.path.join(PATH_SAVING_FOLDER, 'list_sifted')
-PATH_SAVING_BOW_DICT_CV = os.path.join(PATH_SAVING_FOLDER, 'bow_dict_cv')
+class DA(IntEnum):
+    A2R = 0
+    C2R = 1
+    P2R = 2
+    
+DA_A2R_filenames = ['Art_Art','Art_RealWorld']
+DA_C2R_filenames = ['Clipart_Clipart','Clipart_RealWorld']
+DA_P2R_filenames = ['Product_Product','Product_RealWorld']
+DA_filenames = [DA_A2R_filenames, DA_C2R_filenames, DA_P2R_filenames]
 
 
 if __name__=='__main__':
-    print(os.path.exists(PATH_BASE_FOLDER))
+    print(DA.filenames[0])
 
