@@ -7,6 +7,7 @@ import Lglobal_defs as global_defs
 import Ldata_helper as data_helper
 import numpy as np
 import tensorflow as tf
+import os
 
 
 class ADDA:
@@ -35,6 +36,10 @@ class ADDA:
         self._tgt_encoder_scope = 'tgt_encoder'
         self._classifier_scope = 'classifier'
         self._discriminator_scope = 'discriminator'
+        self._path_src_nn = global_defs.mk_dir(os.path.join(self._saving_path, self._src_encoder_scope))
+        self._path_tgt_nn = global_defs.mk_dir(os.path.join(self._saving_path, self._tgt_encoder_scope))
+        self._path_clf_nn = global_defs.mk_dir(os.path.join(self._saving_path, self._classifier_scope))
+        self._path_dsc_nn = global_defs.mk_dir(os.path.join(self._saving_path, self._discriminator_scope))
 
     @staticmethod
     def _gen_weights(shape):
@@ -161,13 +166,22 @@ class ADDA:
         if do_close_sess:
             self._sess.close()
 
+    def _build_ad_loss(self):
+        disc_s = self._sec_encoder_yo
+        disc_t = self._tgt_encoder_yo
+        g_loss = tf.nn.sigmoid_cross_entropy_with_logits(
+            logits=disc_t, labels=tf.ones_like(disc_t))
+        g_loss = tf.reduce_mean(g_loss)
+        d_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=disc_s,labels=tf.ones_like(disc_s)))+tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=disc_t,labels=tf.zeros_like(disc_t)))
+        self._
+
     def _train_discriminator(self, iterations=10000, batch_sz=64):
         self._construct_src_encoder(reuse=False, trainable=False)
         [_src_disc_o, _src_l2_loss, _src_keep_prob] = self._construct_discriminator(
             self._src_encoder_yo, trainable=True)
+        self._construct_tgt_encoder(reuse=False, trainable=True)
+        self._build_ad_loss()
 
-        self._construct_tgt_encoder
-        
     
     def _eval(self, labeled_data):
         return self._acc.eval(feed_dict={self._x: labeled_data[0], self._y:labeled_data[1], self._keep_prob:1.0})
