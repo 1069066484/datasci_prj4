@@ -22,6 +22,7 @@ PATH_RESNET50_FOLDER = '../Office-Home_resnet50'
 PATH_SAVING = mk_dir('Lsaving')
 PATH_MNIST = os.path.join(PATH_SAVING, 'MNIST_data')
 PATH_RAW_DL_FEATURES = mk_dir(os.path.join(PATH_SAVING, 'raw_dls'))
+PATH_ADDA_SAVING = mk_dir(os.path.join(PATH_SAVING, 'adda'))
 
 
 class DA(IntEnum):
