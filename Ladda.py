@@ -128,7 +128,7 @@ class ADDA:
         indices = [i-self._src_train_dl[0].shape[0] if i >= self._src_train_dl[0].shape[0] else i for i in indices]
         return [self._src_train_dl[0][indices], self._src_train_dl[1][indices]]
 
-    def _construct_discriminator(self, inputs, trainable):
+    def _construct_discriminator(self, inputs, reuse, trainable):
         with tf.variable_scope(self._discriminator_scope, reuse=reuse):
             prev_dim = self._h_neurons_encoder[:-1]
             add_layer = self._add_layer
@@ -167,20 +167,27 @@ class ADDA:
             self._sess.close()
 
     def _build_ad_loss(self):
-        disc_s = self._sec_encoder_yo
-        disc_t = self._tgt_encoder_yo
+        disc_s = self._construct_discriminator(self._src_encoder_yo, reuse=False, trainable=True)
+        disc_t = self._construct_discriminator(self._tgt_encoder_yo, reuse=True, trainable=True)
         g_loss = tf.nn.sigmoid_cross_entropy_with_logits(
             logits=disc_t, labels=tf.ones_like(disc_t))
         g_loss = tf.reduce_mean(g_loss)
         d_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=disc_s,labels=tf.ones_like(disc_s)))+tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=disc_t,labels=tf.zeros_like(disc_t)))
-        self._
+        self._generator_loss = g_loss
+        self._discriminator_loss = d_loss
 
     def _train_discriminator(self, iterations=10000, batch_sz=64):
         self._construct_src_encoder(reuse=False, trainable=False)
         [_src_disc_o, _src_l2_loss, _src_keep_prob] = self._construct_discriminator(
             self._src_encoder_yo, trainable=True)
         self._construct_tgt_encoder(reuse=False, trainable=True)
+
         self._build_ad_loss()
+        tgt_encoder_train_variables = tf.trainable_variables(self._tgt_encoder_scope)
+        optimizer_gen = tf.train.AdamOptimizer(learning_rate=self._opt_step,beta1=0.5,
+                                                beta2=0.999).minimize(self._generator_loss,var_list=tgt_encoder_train_variables)
+        disc_
+        optimizer_disc = 
 
     
     def _eval(self, labeled_data):
