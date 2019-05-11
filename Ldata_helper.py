@@ -60,7 +60,7 @@ def read_paired_labeled_features(type_DA):
         return list(pickle.load(open(path_src_dst_da_lf, 'rb')))
     src_csv = csvfilename(os.path.join(global_defs.PATH_RESNET50_FOLDER, src_csv))
     dst_csv = csvfilename(os.path.join(global_defs.PATH_RESNET50_FOLDER, dst_csv))
-    src_dst_da_lf = [read_labeled_features(src_csv), read_labeled_features(dst_csv)]
+    src_dst_da_lf = [list(read_labeled_features(src_csv)), list(read_labeled_features(dst_csv))]
     pickle.dump(src_dst_da_lf, open(path_src_dst_da_lf, 'wb'))
     return list(src_dst_da_lf)
 
@@ -123,6 +123,13 @@ def labels2one_hot(labels):
     return labels
 
 
+def shuffle_labeled_data(dl):
+    data, labels = dl
+    a = np.arange(labels.shape[0])
+    np.random.shuffle(a)
+    return [data[a], labels[a]]
+
+
 def _get_dicts_test():
     id2name, name2id = get_dicts()
     print(id2name, name2id)
@@ -142,4 +149,4 @@ def _test_labels_one_hot():
 
 
 if __name__ == '__main__':
-    _test_labels_one_hot()
+    _test_read_paired_labeled_features()
