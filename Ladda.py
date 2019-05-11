@@ -10,6 +10,7 @@ import tensorflow as tf
 import os
 import itertools
 
+
 class ADDA:
     def __init__(self, saving_path, src_tgt_labeled_data=None, h_neurons_encoder=[1024, 196],  h_neurons_classifier=[128],
                  h_neurons_discriminator=[128], train_test_split=0.6, opt_step=0.001, l2=0.005, keep_prob=0.5):
@@ -143,12 +144,13 @@ class ADDA:
 
     def _construct_discriminator(self, inputs, reuse, trainable):
         with tf.variable_scope(self._discriminator_scope, reuse=reuse):
-            prev_dim = self._h_neurons_encoder[:-1]
+            prev_dim = self._h_neurons_encoder[-1]
             add_layer = self._add_layer
             if self._discriminator_l2_loss is None:
                 self._discriminator_l2_loss = tf.Variable(tf.constant(0.0))
             if self._discriminator_keep_prob is None:
                 self._discriminator_keep_prob = tf.placeholder(tf.float32)
+            h = inputs
             for neurons in self._h_neurons_discriminator:
                 h, self._discriminator_l2_loss = add_layer(h, prev_dim, neurons, act_fun=tf.nn.sigmoid, 
                         l2_loss=self._discriminator_l2_loss, keep_prob=self._discriminator_keep_prob, trainable=trainable)
@@ -157,13 +159,29 @@ class ADDA:
                 l2_loss=self._discriminator_l2_loss, keep_prob=self._discriminator_keep_prob, trainable=trainable)
             return _disc_o
 
-    def _train_classifier(self, iterations=10000, batch_sz=64):
+    def _try_get_saver(self, scope, path, do_clear, do_raise=None):
+        vars = tf.trainable_variables(scope=scope)
+        saver = tf.train.Saver(var_list=vars)
+        ckpt = tf.train.get_checkpoint_state(path)
+        if not do_clear and ckpt and ckpt.model_checkpoint_path:
+            print("{} check point is found!".format(scope))
+            saver.restore(self._sess, ckpt.model_checkpoint_path)
+        elif do_raise is not None:
+            raise Exception(do_raise)
+        return saver
+
+    def _save_nn(self, saver, path):
+        saver.save(self._sess, os.path.join(path, 'model.ckpt'))
+
+    def _train_classifier(self, iterations=10000, batch_sz=64, do_clear=False):
         self._construct_src_encoder(reuse=False, trainable=True)
         self._construct_classifier(self._src_encoder_yo, self._src_encoder_l2_loss, reuse=False, trainable=True)
         self._history_classifier = [[],[],[]]
         self._sess = tf.InteractiveSession()
         self._sess.run(tf.global_variables_initializer())
-
+        best_acc = -1
+        saver_clf = self._try_get_saver(self._classifier_scope, self._path_clf_nn, do_clear)
+        saver_src_encoder = self._try_get_saver(self._src_encoder_scope, self._path_src_nn, do_clear)
         for i in range(iterations):
             data, labels = self._next_batch_classifier(batch_sz)
             if i % 2000 == 0:
@@ -173,7 +191,12 @@ class ADDA:
                               {self._src_encoder_xi:self._src_test_dl[0], self._classifier_y:self._src_test_dl[1], self._classifier_keep_prob:1.0, self._src_encoder_keep_prob:1.0})
                 loss = self._sess.run(self._classifier_loss,
                     feed_dict={self._src_encoder_xi:self._src_train_dl[0], self._classifier_y:self._src_train_dl[1], self._classifier_keep_prob:1.0, self._src_encoder_keep_prob:1.0})
-                print('it={}'.format(i), '  train_acc=', train_acc, '  test_acc=', test_acc, '  loss=', loss)
+                if test_acc > best_acc:
+                    best_acc = test_acc
+                    self._save_nn(saver_clf, self._path_clf_nn)
+                    self._save_nn(saver_src_encoder, self._path_src_nn)
+                    #saver_clf.save(self._sess, os.path.join(self._path_clf_nn, 'model.ckpt'))
+                print('it={}'.format(i), '  train_acc=', train_acc, '  test_acc=', test_acc, '  loss=', loss, 'best_acc=',best_acc)
                 self._history_classifier[0].append(train_acc)
                 self._history_classifier[1].append(test_acc)
                 self._history_classifier[2].append(loss)
@@ -200,7 +223,7 @@ class ADDA:
         predicted_accuracy = tf.reduce_mean(tf.cast(correct_label_predicted,tf.float32))
         return predicted_accuracy
 
-    def _train_discriminator(self, iterations=10000, batch_sz=64):
+    def _train_discriminator(self, iterations=3000, batch_sz=64, do_clear=False):
         self._construct_src_encoder(reuse=False, trainable=False)
         self._construct_tgt_encoder(reuse=False, trainable=True)
         self._build_ad_loss()
@@ -212,22 +235,56 @@ class ADDA:
                                                 beta2=0.999).minimize(self._discriminator_loss,var_list=disc_trainable_variables)
         self._sess = tf.InteractiveSession()
         self._sess.run(tf.global_variables_initializer())
+        saver_src_encoder = self._try_get_saver(self._src_encoder_scope, self._path_src_nn,  False, 
+                                                "Cannot find source encoder parameters")
+        saver_tgt_encoder = self._try_get_saver(self._tgt_encoder_scope, self._path_tgt_nn, do_clear)
+        saver_discriminator = self._try_get_saver(self._discriminator_scope, self._path_dsc_nn, do_clear)
         for i in range(iterations):
             [src_dl, tgt_dl] = self._next_batch_discriminator(batch_sz)
             dict = {self._tgt_encoder_xi: tgt_dl[0], self._src_encoder_xi: src_dl[0], 
-                    self._tgt_encoder_keep_prob: self._train_keep_prob, self._discriminator_keep_prob: self._train_keep_prob} 
-            optimizer_gen.run(dict=dict)
-            optimizer_disc.run(dict=dict)
+                    self._tgt_encoder_keep_prob: self._train_keep_prob, self._discriminator_keep_prob: 1.0, self._src_encoder_keep_prob: 1.0} 
+            optimizer_gen.run(feed_dict=dict)
+            dict[self._tgt_encoder_keep_prob] = 1.0
+            dict[self._discriminator_keep_prob] = self._train_keep_prob
+            optimizer_disc.run(feed_dict=dict)
             if i % 1000 == 0:
-                gen_loss = self._generator_loss.eval(dict=dict)
-                disc_loss = self._discriminator_loss.eval(dict=dict)
-                tgt1 = self._tgt_disc_acc1.eval(dict=dict)
-                src1 = self._src_disc_acc1.eval(dict=dict)
+                dict[self._discriminator_keep_prob] = 1.0
+                gen_loss = self._generator_loss.eval(feed_dict=dict)
+                disc_loss = self._discriminator_loss.eval(feed_dict=dict)
+                tgt1 = self._tgt_disc_acc1.eval(feed_dict=dict)
+                src1 = self._src_disc_acc1.eval(feed_dict=dict)
                 print("it:", i, 'gen_loss=',gen_loss,'disc_loss=',disc_loss,'target1=',tgt1, 'source1=',src1)
                 self._histories_discriminator[0].append(gen_loss)
                 self._histories_discriminator[1].append(disc_loss)
                 self._histories_discriminator[2].append(tgt1)
                 self._histories_discriminator[3].append(src1)
+        self._save_nn(saver_tgt_encoder, self._path_tgt_nn)
+        self._save_nn(saver_discriminator, self._path_dsc_nn)
+        self._sess.close()
+
+    def _domain_adaptation(self):
+        self._construct_src_encoder(reuse=False, trainable=False)
+        self._construct_tgt_encoder(reuse=False, trainable=False)
+        self._construct_classifier(self._src_encoder_yo, self._src_encoder_l2_loss, reuse=False, trainable=False)
+        self._sess = tf.InteractiveSession()
+        self._sess.run(tf.global_variables_initializer())
+        saver_src_encoder = self._try_get_saver(self._src_encoder_scope, self._path_src_nn,  False, 
+                                                "Cannot find source encoder parameters")
+        saver_clf = self._try_get_saver(self._classifier_scope, self._path_clf_nn,  False, 
+                                                "Cannot find classifier parameters")
+        test_acc_src = self._classifier_acc.eval(feed_dict={self._src_encoder_xi:self._src_test_dl[0], self._classifier_y:self._src_test_dl[1], self._classifier_keep_prob:1.0, self._src_encoder_keep_prob:1.0})
+        test_acc_tgt = self._classifier_acc.eval(feed_dict={self._src_encoder_xi:self._tgt_dl[0], self._classifier_y:self._tgt_dl[1],
+                                                       self._classifier_keep_prob:1.0, self._src_encoder_keep_prob:1.0})
+
+        saver_tgt_encoder = self._try_get_saver(self._tgt_encoder_scope, self._path_tgt_nn,  False, 
+                                                "Cannot find target encoder parameters")
+        self._construct_classifier(self._tgt_encoder_yo, self._tgt_encoder_l2_loss, reuse=tf.AUTO_REUSE, trainable=False)
+        self._sess.run(tf.global_variables_initializer())
+        test_acc_tgt_adapted = self._classifier_acc.eval(feed_dict={self._tgt_encoder_xi:self._tgt_dl[0], self._classifier_y:self._tgt_dl[1],
+                                                       self._classifier_keep_prob:1.0, self._tgt_encoder_keep_prob:1.0})
+        print("Source domain test dataset acc:", test_acc_src, '\n',
+              "Target domain data set using source encoder acc:", test_acc_tgt, '\n',
+              "Target domain data set using target encoder acc:", test_acc_tgt_adapted, '\n')
         self._sess.close()
 
     def historys(self):
@@ -284,17 +341,38 @@ class ADDA:
 def _test_classifier():
     da_type = global_defs.DA.A2R
     dl_src, dl_tgt = data_helper.read_paired_labeled_features(da_type)
-    #64 labels
-    #print(dl_src)
-    #neurons = GeneralNNClassifier.neuron_arrange([128, 196, 256, 512, 1024], 3, True)
     neurons = [[1024, 196, 128]]
     to_prt = []
     iterations=30000
     batch_sz = 256
 
     adda = ADDA(global_defs.mk_dir( os.path.join(global_defs.PATH_SAVING, 'ADDA_test')), [dl_src, dl_tgt])
-    adda._train_classifier()
+    adda._train_classifier(iterations=2500)
+
+
+def _test_discriminator():
+    da_type = global_defs.DA.A2R
+    dl_src, dl_tgt = data_helper.read_paired_labeled_features(da_type)
+    neurons = [[1024, 196, 128]]
+    to_prt = []
+    iterations=30000
+    batch_sz = 256
+    adda = ADDA(global_defs.mk_dir( os.path.join(global_defs.PATH_SAVING, 'ADDA_test')), [dl_src, dl_tgt])
+    adda._train_discriminator()
+
+
+def _test_domain_adaptation():
+    da_type = global_defs.DA.A2R
+    dl_src, dl_tgt = data_helper.read_paired_labeled_features(da_type)
+    neurons = [[1024, 196, 128]]
+    to_prt = []
+    iterations=30000
+    batch_sz = 256
+    adda = ADDA(global_defs.mk_dir( os.path.join(global_defs.PATH_SAVING, 'ADDA_test')), [dl_src, dl_tgt])
+    adda._domain_adaptation()
 
 
 if __name__=='__main__':
-    _test_classifier()
+    #_test_classifier()
+    #_test_discriminator()
+    _test_domain_adaptation()
