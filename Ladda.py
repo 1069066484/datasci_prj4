@@ -263,9 +263,9 @@ class ADDA:
         self._sess.close()
 
     def _domain_adaptation(self):
-        self._construct_src_encoder(reuse=False, trainable=False)
-        self._construct_tgt_encoder(reuse=False, trainable=False)
-        self._construct_classifier(self._src_encoder_yo, self._src_encoder_l2_loss, reuse=False, trainable=False)
+        self._construct_src_encoder(reuse=False, trainable=True)
+        self._construct_tgt_encoder(reuse=False, trainable=True)
+        self._construct_classifier(self._src_encoder_yo, self._src_encoder_l2_loss, reuse=False, trainable=True)
         self._sess = tf.InteractiveSession()
         self._sess.run(tf.global_variables_initializer())
         saver_src_encoder = self._try_get_saver(self._src_encoder_scope, self._path_src_nn,  False, 
