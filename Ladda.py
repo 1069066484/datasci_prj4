@@ -112,22 +112,24 @@ class ADDA:
             add_layer = self._add_layer
             h = inputs
             prev_dim = self._h_neurons_encoder[-1]
+            layer_idx = 0
             for neurons in self._h_neurons_classifier:
                 h, _l2_loss = add_layer(h, prev_dim, neurons, act_fun=tf.nn.relu, 
-                                        l2_loss=_l2_loss, keep_prob=_keep_prob, trainable=trainable)
+                                        l2_loss=_l2_loss, keep_prob=_keep_prob, trainable=trainable, layer_idx=layer_idx)
                 prev_dim = neurons
+                layer_idx += 1
             _yo, _l2_loss = add_layer(h, prev_dim, self._label_count, act_fun=None, 
-                        l2_loss=_l2_loss, keep_prob=_keep_prob, trainable=trainable)
-            self._classifier_yo = _yo
-            self._classifier_l2_loss = _l2_loss
-            self._classifier_keep_prob = _keep_prob
-            self._classifier_y = tf.placeholder(tf.float32, [None, self._label_count])
-            self._classifier_loss = tf.reduce_mean(
-                tf.nn.softmax_cross_entropy_with_logits(labels=self._classifier_y, logits=_yo)) + _l2_loss
-            self._classifier_trainer = tf.train.AdamOptimizer(self._opt_step).minimize(self._classifier_loss)
-            #correct_prediction = tf.equal(tf.argmax(self._classifier_yo, 1), tf.argmax(self._classifier_y, 1))
-            #self._classifier_acc = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
-            self._classifier_acc = self._softmax_eval_acc(self._classifier_yo, self._classifier_y)
+                        l2_loss=_l2_loss, keep_prob=_keep_prob, trainable=trainable, layer_idx=layer_idx)
+        self._classifier_yo = _yo
+        self._classifier_l2_loss = _l2_loss
+        self._classifier_keep_prob = _keep_prob
+        self._classifier_y = tf.placeholder(tf.float32, [None, self._label_count])
+        self._classifier_loss = tf.reduce_mean(
+            tf.nn.softmax_cross_entropy_with_logits(labels=self._classifier_y, logits=_yo)) + _l2_loss
+        self._classifier_trainer = tf.train.AdamOptimizer(self._opt_step).minimize(self._classifier_loss)
+        #correct_prediction = tf.equal(tf.argmax(self._classifier_yo, 1), tf.argmax(self._classifier_y, 1))
+        #self._classifier_acc = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+        self._classifier_acc = self._softmax_eval_acc(self._classifier_yo, self._classifier_y)
 
     def _next_batch_classifier(self, batch_sz):
         indices = list(range(self._classifier_curr_batch_idx, self._classifier_curr_batch_idx+batch_sz))
@@ -162,7 +164,8 @@ class ADDA:
             return _disc_o
 
     def _try_get_saver(self, scope, path, do_clear, do_raise=None, ret_state=False, only_trainable=True):
-        vars = tf.trainable_variables(scope=scope) if only_trainable else tf.global_variables(scope=scope)
+        #vars = tf.trainable_variables(scope=scope) if only_trainable else tf.global_variables(scope=scope)
+        vars = tf.global_variables(scope=scope)
         saver = tf.train.Saver(var_list=vars)
         ckpt = tf.train.get_checkpoint_state(path)
         success = False
@@ -178,6 +181,8 @@ class ADDA:
         saver.save(self._sess, os.path.join(path, 'model.ckpt'))
 
     def _train_classifier(self, iterations=10000, batch_sz=64, do_clear=False):
+        self._construct_tgt_encoder(reuse=False, trainable=True)
+        self._construct_classifier(self._tgt_encoder_yo, self._tgt_encoder_l2_loss, reuse=False, trainable=True)
         self._construct_src_encoder(reuse=False, trainable=True)
         self._construct_classifier(self._src_encoder_yo, self._src_encoder_l2_loss, reuse=False, trainable=True)
         self._history_classifier = [[],[],[]]
@@ -186,10 +191,11 @@ class ADDA:
         best_acc = -1
         saver_clf = self._try_get_saver(self._classifier_scope, self._path_clf_nn, do_clear)
         saver_src_encoder = self._try_get_saver(self._src_encoder_scope, self._path_src_nn, do_clear)
+        saver_tgt_encoder = self._try_get_saver(self._tgt_encoder_scope, self._path_tgt_nn, do_clear)
 
         for i in range(iterations):
             data, labels = self._next_batch_classifier(batch_sz)
-            if i % 2000 == 0:
+            if i % 500 == 0:
                 train_acc = self._classifier_acc.eval(feed_dict=
                               {self._src_encoder_xi:data, self._classifier_y:labels, self._classifier_keep_prob:1.0, self._src_encoder_keep_prob:1.0})
                 test_acc = self._classifier_acc.eval(feed_dict=
@@ -198,6 +204,7 @@ class ADDA:
                     feed_dict={self._src_encoder_xi:self._src_train_dl[0], self._classifier_y:self._src_train_dl[1], self._classifier_keep_prob:1.0, self._src_encoder_keep_prob:1.0})
                 if test_acc > best_acc:
                     best_acc = test_acc
+                    #self._copy_classifier()
                     self._save_nn(saver_clf, self._path_clf_nn)
                     self._save_nn(saver_src_encoder, self._path_src_nn)
                     #saver_clf.save(self._sess, os.path.join(self._path_clf_nn, 'model.ckpt'))
@@ -207,6 +214,7 @@ class ADDA:
                 self._history_classifier[2].append(loss)
             self._classifier_trainer.run(feed_dict=
                               {self._src_encoder_xi:data, self._classifier_y:labels, self._classifier_keep_prob:self._train_keep_prob, self._src_encoder_keep_prob:self._train_keep_prob})
+        self._save_nn(saver_tgt_encoder, self._path_tgt_nn)
         self._sess.close()
 
     def _build_ad_loss(self):
@@ -229,17 +237,26 @@ class ADDA:
         return predicted_accuracy
 
     def _copy_encoder(self):
-        src_vars = tf.trainable_variables(scope=self._src_encoder_scope)
-        tgt_vars = tf.trainable_variables(scope=self._tgt_encoder_scope)
+        src_vars = tf.global_variables(scope=self._src_encoder_scope)
+        tgt_vars = tf.global_variables(scope=self._tgt_encoder_scope)
         for src_v in src_vars:
             for tgt_v in tgt_vars:
                 if src_v.name[4:] == tgt_v.name[4:]:
                     src_var_val = self._sess.run(src_v)
                     self._sess.run(tgt_v.assign(src_var_val))
 
+    def _copy_classifier(self):
+        clf_vars = tf.global_variables(scope=self._classifier_scope)
+        print("len(clf_vars)=",len(clf_vars))
+        len_half = round(len(clf_vars)/2)
+        for i in range( len_half):
+            var0 = self._sess.run(clf_vars[i+len_half])
+            self._sess.run(clf_vars[i].assign(var0))
+
     def _train_discriminator(self, iterations=3000, batch_sz=64, do_clear=False):
-        self._construct_src_encoder(reuse=False, trainable=True)
         self._construct_tgt_encoder(reuse=False, trainable=True)
+        self._construct_src_encoder(reuse=False, trainable=False)
+        
         self._build_ad_loss()
         tgt_encoder_train_variables = tf.trainable_variables(self._tgt_encoder_scope)
         optimizer_gen = tf.train.AdamOptimizer(learning_rate=self._opt_step,beta1=0.5,
@@ -247,12 +264,17 @@ class ADDA:
         disc_trainable_variables = tf.trainable_variables(self._discriminator_scope)
         optimizer_disc = tf.train.AdamOptimizer(learning_rate=self._opt_step,beta1=0.5,
                                                 beta2=0.999).minimize(self._discriminator_loss,var_list=disc_trainable_variables)
+        
         self._sess = tf.InteractiveSession()
         self._sess.run(tf.global_variables_initializer())
+
         saver_src_encoder = self._try_get_saver(self._src_encoder_scope, self._path_src_nn,  False, 
-                                                "Cannot find source encoder parameters", only_trainable=True)
-        saver_tgt_encoder, loaded = self._try_get_saver(self._tgt_encoder_scope, self._path_tgt_nn, do_clear, ret_state=True)
+                                                "Cannot find source encoder parameters", only_trainable=False)
+        saver_tgt_encoder, loaded = self._try_get_saver(self._tgt_encoder_scope, self._path_tgt_nn, do_clear, ret_state=True, 
+                                                        only_trainable=False)
+       
         if not loaded:
+            print("_copy_encoder")
             self._copy_encoder()
         saver_discriminator = self._try_get_saver(self._discriminator_scope, self._path_dsc_nn, do_clear)
         for i in range(iterations):
@@ -278,29 +300,86 @@ class ADDA:
         self._save_nn(saver_discriminator, self._path_dsc_nn)
         self._sess.close()
 
-    def _domain_adaptation(self):
-        self._construct_src_encoder(reuse=False, trainable=True)
-        self._construct_tgt_encoder(reuse=False, trainable=True)
-        self._construct_classifier(self._src_encoder_yo, self._src_encoder_l2_loss, reuse=False, trainable=True)
+    def _domain_adaptation_src_encoder(self):
+        self._construct_src_encoder(reuse=False, trainable=False)
+        self._construct_classifier(self._src_encoder_yo, self._src_encoder_l2_loss, reuse=False, trainable=False)
+        for v in tf.global_variables(scope=self._classifier_scope):
+            print(v.name)
+        #return None
         self._sess = tf.InteractiveSession()
         self._sess.run(tf.global_variables_initializer())
+        saver_src_encoder = self._try_get_saver(self._src_encoder_scope, self._path_src_nn,  False, 
+                                                "Cannot find source encoder parameters", only_trainable=False)
+        saver_clf = self._try_get_saver(self._classifier_scope, self._path_clf_nn,  False, 
+                                                "Cannot find classifier parameters", only_trainable=False)
+        test_acc_src = self._classifier_acc.eval(feed_dict={self._src_encoder_xi:self._src_test_dl[0], self._classifier_y:self._src_test_dl[1], self._classifier_keep_prob:1.0, self._src_encoder_keep_prob:1.0})
+        test_acc_tgt = self._classifier_acc.eval(feed_dict={self._src_encoder_xi:self._tgt_dl[0], self._classifier_y:self._tgt_dl[1],
+                                                       self._classifier_keep_prob:1.0, self._src_encoder_keep_prob:1.0})
+        print("Source domain test dataset acc:", test_acc_src, '\n',
+              "Target domain data set using source encoder acc:", test_acc_tgt, '\n')
+        #self._sess.close()
+
+    def _domain_adaptation(self):
+        self._construct_src_encoder(reuse=False, trainable=False)
+        self._construct_classifier(self._src_encoder_yo, self._src_encoder_l2_loss, reuse=False, trainable=False)
+        src_encoder_acc = self._classifier_acc
+        src_encoder_feed_dict={self._classifier_keep_prob:1.0, self._src_encoder_keep_prob:1.0}
+        src_encoder_classifier_y = self._classifier_y
+
+        self._construct_tgt_encoder(reuse=False, trainable=False)
+        self._construct_classifier(self._tgt_encoder_yo, self._tgt_encoder_l2_loss, reuse=False, trainable=False)
+        tgt_encoder_acc = self._classifier_acc
+        tgt_encoder_feed_dict={self._classifier_keep_prob:1.0, self._tgt_encoder_keep_prob:1.0}
+        tgt_encoder_classifier_y = self._classifier_y
+
+        self._sess = tf.InteractiveSession()
+        self._sess.run(tf.global_variables_initializer())
+
         saver_src_encoder = self._try_get_saver(self._src_encoder_scope, self._path_src_nn,  False, 
                                                 "Cannot find source encoder parameters")
         saver_clf = self._try_get_saver(self._classifier_scope, self._path_clf_nn,  False, 
                                                 "Cannot find classifier parameters")
-        test_acc_src = self._classifier_acc.eval(feed_dict={self._src_encoder_xi:self._src_test_dl[0], self._classifier_y:self._src_test_dl[1], self._classifier_keep_prob:1.0, self._src_encoder_keep_prob:1.0})
-        test_acc_tgt = self._classifier_acc.eval(feed_dict={self._src_encoder_xi:self._tgt_dl[0], self._classifier_y:self._tgt_dl[1],
-                                                       self._classifier_keep_prob:1.0, self._src_encoder_keep_prob:1.0})
-
         saver_tgt_encoder = self._try_get_saver(self._tgt_encoder_scope, self._path_tgt_nn,  False, 
                                                 "Cannot find target encoder parameters")
-        self._construct_classifier(self._tgt_encoder_yo, self._tgt_encoder_l2_loss, reuse=tf.AUTO_REUSE, trainable=False)
-        self._sess.run(tf.global_variables_initializer())
-        test_acc_tgt_adapted = self._classifier_acc.eval(feed_dict={self._tgt_encoder_xi:self._tgt_dl[0], self._classifier_y:self._tgt_dl[1],
-                                                       self._classifier_keep_prob:1.0, self._tgt_encoder_keep_prob:1.0})
+
+        self._copy_classifier()
+
+        src_encoder_feed_dict.update({self._src_encoder_xi:self._src_test_dl[0], src_encoder_classifier_y:self._src_test_dl[1]})
+        test_acc_src = src_encoder_acc.eval(feed_dict=src_encoder_feed_dict)
+        src_encoder_feed_dict.update({self._src_encoder_xi:self._tgt_dl[0], src_encoder_classifier_y:self._tgt_dl[1]})
+        test_acc_tgt = src_encoder_acc.eval(feed_dict=src_encoder_feed_dict)
+
+        tgt_encoder_feed_dict.update({self._tgt_encoder_xi:self._tgt_dl[0], tgt_encoder_classifier_y:self._tgt_dl[1]})
+        test_acc_tgt_adapted = tgt_encoder_acc.eval(feed_dict=tgt_encoder_feed_dict)
         print("Source domain test dataset acc:", test_acc_src, '\n',
               "Target domain data set using source encoder acc:", test_acc_tgt, '\n',
               "Target domain data set using target encoder acc:", test_acc_tgt_adapted, '\n')
+        self._sess.close()
+
+    def _check_vars(self, scope, output_val=False):
+        for v in tf.global_variables(scope=scope):
+            print(v.name, "" if not output_val else self._sess.run(v))
+
+    def _domain_adaptation_tgt_encoder(self):
+        self._construct_tgt_encoder(reuse=False, trainable=False)
+        self._construct_classifier(self._tgt_encoder_yo, self._tgt_encoder_l2_loss, reuse=False, trainable=False)
+        for v in tf.global_variables(scope=self._classifier_scope):
+            print(v.name)
+        #exit(0)
+        self._sess.run(tf.global_variables_initializer())
+        #self._copy_classifier()
+        #self._sess = tf.InteractiveSession()
+        
+        #input()
+        #saver_clf = self._try_get_saver(self._classifier_scope, self._path_clf_nn,  False, 
+        #                                        "Cannot find classifier parameters")
+        #input()
+        saver_tgt_encoder = self._try_get_saver(self._tgt_encoder_scope, self._path_tgt_nn,  False, 
+                                                "Cannot find target encoder parameters")
+
+        test_acc_tgt_adapted = self._classifier_acc.eval(feed_dict={self._tgt_encoder_xi:self._tgt_dl[0], self._classifier_y:self._tgt_dl[1],
+                                                       self._classifier_keep_prob:1.0, self._tgt_encoder_keep_prob:1.0})
+        print("Target domain data set using target encoder acc:", test_acc_tgt_adapted, '\n')
         self._sess.close()
 
     def historys(self):
@@ -363,7 +442,7 @@ def _test_classifier():
     batch_sz = 256
 
     adda = ADDA(global_defs.mk_dir( os.path.join(global_defs.PATH_SAVING, 'ADDA_test')), [dl_src, dl_tgt])
-    adda._train_classifier(iterations=2500)
+    adda._train_classifier(iterations=2000)
 
 
 def _test_discriminator():
@@ -374,7 +453,7 @@ def _test_discriminator():
     iterations=30000
     batch_sz = 256
     adda = ADDA(global_defs.mk_dir( os.path.join(global_defs.PATH_SAVING, 'ADDA_test')), [dl_src, dl_tgt])
-    adda._train_discriminator()
+    adda._train_discriminator(iterations=1)
 
 
 def _test_domain_adaptation():
@@ -385,10 +464,148 @@ def _test_domain_adaptation():
     iterations=30000
     batch_sz = 256
     adda = ADDA(global_defs.mk_dir( os.path.join(global_defs.PATH_SAVING, 'ADDA_test')), [dl_src, dl_tgt])
+    #adda._domain_adaptation()
+    #exit(0)
     adda._domain_adaptation()
+    print('\n')
+    #adda._domain_adaptation_tgt_encoder()
 
 
 if __name__=='__main__':
     #_test_classifier()
-    _test_discriminator()
-    #_test_domain_adaptation()
+    #_test_discriminator()
+    _test_domain_adaptation()
+
+
+    """
+    self._classifier_scope:
+classifier/Variable:0
+classifier/w0:0
+classifier/b0:0
+classifier/Variable_1:0
+classifier/w1:0
+classifier/b1:0
+classifier/w0/Adam:0
+classifier/w0/Adam_1:0
+classifier/b0/Adam:0
+classifier/b0/Adam_1:0
+classifier/w1/Adam:0
+classifier/w1/Adam_1:0
+classifier/b1/Adam:0
+classifier/b1/Adam_1:0
+classifier_1/Variable:0
+classifier_1/w0:0
+classifier_1/b0:0
+classifier_1/Variable_1:0
+classifier_1/w1:0
+classifier_1/b1:0
+classifier_1/w0/Adam:0
+classifier_1/w0/Adam_1:0
+classifier_1/b0/Adam:0
+classifier_1/b0/Adam_1:0
+classifier_1/w1/Adam:0
+classifier_1/w1/Adam_1:0
+classifier_1/b1/Adam:0
+classifier_1/b1/Adam_1:0
+
+self._src_encoder_scope:
+src_encoder/l2_loss:0
+src_encoder/Variable:0
+src_encoder/w0:0
+src_encoder/b0:0
+src_encoder/Variable_1:0
+src_encoder/w1:0
+src_encoder/b1:0
+src_encoder/l2_loss/Adam:0
+src_encoder/l2_loss/Adam_1:0
+src_encoder/w0/Adam:0
+src_encoder/w0/Adam_1:0
+src_encoder/b0/Adam:0
+src_encoder/b0/Adam_1:0
+src_encoder/w1/Adam:0
+src_encoder/w1/Adam_1:0
+src_encoder/b1/Adam:0
+src_encoder/b1/Adam_1:0
+
+self._tgt_encoder_scope:
+tgt_encoder/l2_loss:0
+tgt_encoder/Variable:0
+tgt_encoder/w0:0
+tgt_encoder/b0:0
+tgt_encoder/Variable_1:0
+tgt_encoder/w1:0
+tgt_encoder/b1:0
+tgt_encoder/l2_loss/Adam:0
+tgt_encoder/l2_loss/Adam_1:0
+tgt_encoder/w0/Adam:0
+tgt_encoder/w0/Adam_1:0
+tgt_encoder/b0/Adam:0
+tgt_encoder/b0/Adam_1:0
+tgt_encoder/w1/Adam:0
+tgt_encoder/w1/Adam_1:0
+tgt_encoder/b1/Adam:0
+tgt_encoder/b1/Adam_1:0
+
+***************************************
+elf._src_encoder_scope:
+src_encoder/l2_loss:0
+src_encoder/Variable:0
+src_encoder/w0:0
+src_encoder/b0:0
+src_encoder/Variable_1:0
+src_encoder/w1:0
+src_encoder/b1:0
+src_encoder/l2_loss/Adam:0
+src_encoder/l2_loss/Adam_1:0
+src_encoder/w0/Adam:0
+src_encoder/w0/Adam_1:0
+src_encoder/b0/Adam:0
+src_encoder/b0/Adam_1:0
+src_encoder/w1/Adam:0
+src_encoder/w1/Adam_1:0
+src_encoder/b1/Adam:0
+src_encoder/b1/Adam_1:0
+src_encoder_1/l2_loss:0
+src_encoder_1/Variable:0
+src_encoder_1/w0:0
+src_encoder_1/b0:0
+src_encoder_1/Variable_1:0
+src_encoder_1/w1:0
+src_encoder_1/b1:0
+
+self._tgt_encoder_scope:
+tgt_encoder/l2_loss:0
+tgt_encoder/Variable:0
+tgt_encoder/w0:0
+tgt_encoder/b0:0
+tgt_encoder/Variable_1:0
+tgt_encoder/w1:0
+tgt_encoder/b1:0
+tgt_encoder/l2_loss/Adam:0
+tgt_encoder/l2_loss/Adam_1:0
+tgt_encoder/w0/Adam:0
+tgt_encoder/w0/Adam_1:0
+tgt_encoder/b0/Adam:0
+tgt_encoder/b0/Adam_1:0
+tgt_encoder/w1/Adam:0
+tgt_encoder/w1/Adam_1:0
+tgt_encoder/b1/Adam:0
+tgt_encoder/b1/Adam_1:0
+tgt_encoder_1/l2_loss:0
+tgt_encoder_1/Variable:0
+tgt_encoder_1/w0:0
+tgt_encoder_1/b0:0
+tgt_encoder_1/Variable_1:0
+tgt_encoder_1/w1:0
+tgt_encoder_1/b1:0
+tgt_encoder_1/l2_loss/Adam:0
+tgt_encoder_1/l2_loss/Adam_1:0
+tgt_encoder_1/w0/Adam:0
+tgt_encoder_1/w0/Adam_1:0
+tgt_encoder_1/b0/Adam:0
+tgt_encoder_1/b0/Adam_1:0
+tgt_encoder_1/w1/Adam:0
+tgt_encoder_1/w1/Adam_1:0
+tgt_encoder_1/b1/Adam:0
+tgt_encoder_1/b1/Adam_1:0
+    """
