@@ -62,30 +62,32 @@ class ADDA:
     def _b_generator(b_shape):
         return tf.random_uniform(b_shape,-0.2,0.2)
 
-    def _add_layer(self, input, in_sz, out_sz, l2_loss, keep_prob, trainable, act_fun=None):
+    def _add_layer(self, input, in_sz, out_sz, l2_loss, keep_prob, trainable, act_fun=None, layer_idx=None):
         #w = tf.Variable(tf.truncated_normal([in_sz, out_sz],stddev=0.1))
-        w = tf.Variable(self.w_generator(w_shape=[in_sz,out_sz]),trainable=trainable)
+        w = tf.Variable(self.w_generator(w_shape=[in_sz,out_sz]),trainable=trainable, name=None if layer_idx is None else 'w'+str(layer_idx))
         l2_loss += tf.nn.l2_loss(w) * self._l2_reg
         #tf.assign_add(self._l2_loss, tf.nn.l2_loss(w) * self._l2_reg)
-        b = tf.Variable(self.b_generator(b_shape=[out_sz]), trainable=trainable)
+        b = tf.Variable(self.b_generator(b_shape=[out_sz]), trainable=trainable, name=None if layer_idx is None else 'b'+str(layer_idx))
         wx_plusb = tf.matmul(input, w) + b
         output = wx_plusb if act_fun is None else act_fun(wx_plusb)
         return [tf.nn.dropout(output, keep_prob), l2_loss]
 
     def _constuct_encoder(self, name_scope, reuse, _h_neurons, trainable):
         with tf.variable_scope(name_scope, reuse=reuse):
-            _l2_loss = tf.Variable(tf.constant(0.0))
+            _l2_loss = tf.Variable(tf.constant(0.0), name='l2_loss')
             add_layer = self._add_layer
             _keep_prob = tf.placeholder(tf.float32)
             _xi = tf.placeholder(tf.float32, [None, self._input_dim])
             h = _xi
             prev_dim = self._input_dim
+            layer_idx = 0
             for neurons in _h_neurons[:-1]:
                 h, _l2_loss = add_layer(h, prev_dim, neurons, act_fun=tf.nn.relu, 
-                                        l2_loss=_l2_loss, keep_prob=_keep_prob, trainable=trainable)
+                                        l2_loss=_l2_loss, keep_prob=_keep_prob, trainable=trainable, layer_idx=layer_idx)
                 prev_dim = neurons
+                layer_idx += 1
             _yo, _l2_loss  = add_layer(h, prev_dim, _h_neurons[-1], act_fun=tf.nn.relu, 
-                                       l2_loss=_l2_loss, keep_prob=_keep_prob, trainable=trainable)
+                                       l2_loss=_l2_loss, keep_prob=_keep_prob, trainable=trainable, layer_idx=layer_idx)
             return [_yo, _l2_loss, _keep_prob, _xi]
 
     def _construct_src_encoder(self, reuse, trainable):
@@ -159,16 +161,18 @@ class ADDA:
                 l2_loss=self._discriminator_l2_loss, keep_prob=self._discriminator_keep_prob, trainable=trainable)
             return _disc_o
 
-    def _try_get_saver(self, scope, path, do_clear, do_raise=None):
-        vars = tf.trainable_variables(scope=scope)
+    def _try_get_saver(self, scope, path, do_clear, do_raise=None, ret_state=False, only_trainable=True):
+        vars = tf.trainable_variables(scope=scope) if only_trainable else tf.global_variables(scope=scope)
         saver = tf.train.Saver(var_list=vars)
         ckpt = tf.train.get_checkpoint_state(path)
+        success = False
         if not do_clear and ckpt and ckpt.model_checkpoint_path:
             print("{} check point is found!".format(scope))
             saver.restore(self._sess, ckpt.model_checkpoint_path)
+            success = True
         elif do_raise is not None:
             raise Exception(do_raise)
-        return saver
+        return saver if not ret_state else [saver, success]
 
     def _save_nn(self, saver, path):
         saver.save(self._sess, os.path.join(path, 'model.ckpt'))
@@ -182,6 +186,7 @@ class ADDA:
         best_acc = -1
         saver_clf = self._try_get_saver(self._classifier_scope, self._path_clf_nn, do_clear)
         saver_src_encoder = self._try_get_saver(self._src_encoder_scope, self._path_src_nn, do_clear)
+
         for i in range(iterations):
             data, labels = self._next_batch_classifier(batch_sz)
             if i % 2000 == 0:
@@ -223,8 +228,17 @@ class ADDA:
         predicted_accuracy = tf.reduce_mean(tf.cast(correct_label_predicted,tf.float32))
         return predicted_accuracy
 
+    def _copy_encoder(self):
+        src_vars = tf.trainable_variables(scope=self._src_encoder_scope)
+        tgt_vars = tf.trainable_variables(scope=self._tgt_encoder_scope)
+        for src_v in src_vars:
+            for tgt_v in tgt_vars:
+                if src_v.name[4:] == tgt_v.name[4:]:
+                    src_var_val = self._sess.run(src_v)
+                    self._sess.run(tgt_v.assign(src_var_val))
+
     def _train_discriminator(self, iterations=3000, batch_sz=64, do_clear=False):
-        self._construct_src_encoder(reuse=False, trainable=False)
+        self._construct_src_encoder(reuse=False, trainable=True)
         self._construct_tgt_encoder(reuse=False, trainable=True)
         self._build_ad_loss()
         tgt_encoder_train_variables = tf.trainable_variables(self._tgt_encoder_scope)
@@ -236,8 +250,10 @@ class ADDA:
         self._sess = tf.InteractiveSession()
         self._sess.run(tf.global_variables_initializer())
         saver_src_encoder = self._try_get_saver(self._src_encoder_scope, self._path_src_nn,  False, 
-                                                "Cannot find source encoder parameters")
-        saver_tgt_encoder = self._try_get_saver(self._tgt_encoder_scope, self._path_tgt_nn, do_clear)
+                                                "Cannot find source encoder parameters", only_trainable=True)
+        saver_tgt_encoder, loaded = self._try_get_saver(self._tgt_encoder_scope, self._path_tgt_nn, do_clear, ret_state=True)
+        if not loaded:
+            self._copy_encoder()
         saver_discriminator = self._try_get_saver(self._discriminator_scope, self._path_dsc_nn, do_clear)
         for i in range(iterations):
             [src_dl, tgt_dl] = self._next_batch_discriminator(batch_sz)
@@ -374,5 +390,5 @@ def _test_domain_adaptation():
 
 if __name__=='__main__':
     #_test_classifier()
-    #_test_discriminator()
-    _test_domain_adaptation()
+    _test_discriminator()
+    #_test_domain_adaptation()
