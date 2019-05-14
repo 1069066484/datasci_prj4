@@ -71,10 +71,10 @@ class ADDA:
 
     def _add_layer(self, input, in_sz, out_sz, l2_loss, keep_prob, trainable, act_fun=None, layer_idx=None):
         #w = tf.Variable(tf.truncated_normal([in_sz, out_sz],stddev=0.1))
-        w = tf.Variable(self.w_generator(w_shape=[in_sz,out_sz]),trainable=trainable, name=None if layer_idx is None else 'w'+str(layer_idx))
+        w = tf.get_variable(initializer=self.w_generator(w_shape=[in_sz,out_sz]),trainable=trainable, name=None if layer_idx is None else 'w'+str(layer_idx))
         l2_loss += tf.nn.l2_loss(w) * self._l2_reg
         #tf.assign_add(self._l2_loss, tf.nn.l2_loss(w) * self._l2_reg)
-        b = tf.Variable(self.b_generator(b_shape=[out_sz]), trainable=trainable, name=None if layer_idx is None else 'b'+str(layer_idx))
+        b = tf.get_variable(initializer=self.b_generator(b_shape=[out_sz]), trainable=trainable, name=None if layer_idx is None else 'b'+str(layer_idx))
         wx_plusb = tf.matmul(input, w) + b
         output = wx_plusb if act_fun is None else act_fun(wx_plusb)
         return [tf.nn.dropout(output, keep_prob), l2_loss]
@@ -127,16 +127,15 @@ class ADDA:
                 layer_idx += 1
             _yo, _l2_loss = add_layer(h, prev_dim, self._label_count, act_fun=None, 
                         l2_loss=_l2_loss, keep_prob=_keep_prob, trainable=trainable, layer_idx=layer_idx)
-        self._classifier_yo = _yo
-        self._classifier_l2_loss = _l2_loss
-        self._classifier_keep_prob = _keep_prob
-        self._classifier_y = tf.placeholder(tf.float32, [None, self._label_count])
-        self._classifier_loss = tf.reduce_mean(
-            tf.nn.softmax_cross_entropy_with_logits(labels=self._classifier_y, logits=_yo)) + _l2_loss
-        self._classifier_trainer = tf.train.AdamOptimizer(self._opt_step).minimize(self._classifier_loss)
-        #correct_prediction = tf.equal(tf.argmax(self._classifier_yo, 1), tf.argmax(self._classifier_y, 1))
-        #self._classifier_acc = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
-        self._classifier_acc = self._softmax_eval_acc(self._classifier_yo, self._classifier_y)
+            self._classifier_yo = _yo
+            self._classifier_l2_loss = _l2_loss
+            self._classifier_keep_prob = _keep_prob
+            self._classifier_y = tf.placeholder(tf.float32, [None, self._label_count])
+            self._classifier_loss = tf.reduce_mean(
+                tf.nn.softmax_cross_entropy_with_logits(labels=self._classifier_y, logits=_yo)) + _l2_loss
+            #correct_prediction = tf.equal(tf.argmax(self._classifier_yo, 1), tf.argmax(self._classifier_y, 1))
+            #self._classifier_acc = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+            self._classifier_acc = self._softmax_eval_acc(self._classifier_yo, self._classifier_y)
 
     def _next_batch_classifier(self, batch_sz):
         indices = list(range(self._classifier_curr_batch_idx, self._classifier_curr_batch_idx+batch_sz))
@@ -145,28 +144,31 @@ class ADDA:
         return [self._src_train_dl[0][indices], self._src_train_dl[1][indices]]
 
     def _next_batch_discriminator(self, batch_sz=64):
-        indices = list(range(self._classifier_curr_batch_idx, self._classifier_curr_batch_idx+batch_sz))
-        self._discriminator_curr_batch_idx = (batch_sz + self._classifier_curr_batch_idx) % \
+        indices = list(range(self._discriminator_curr_batch_idx, self._discriminator_curr_batch_idx+batch_sz))
+        self._discriminator_curr_batch_idx = (batch_sz + self._discriminator_curr_batch_idx) % \
                         (self._src_train_dl[0].shape[0] * self._tgt_dl[0].shape[0])
         indices_src = [i%self._src_train_dl[0].shape[0] for i in indices]
         indices_tgt = [i%self._tgt_dl[0].shape[0] for i in indices]
+
         return [[self._src_train_dl[0][indices_src], self._src_train_dl[1][indices_src]],
                 [self._tgt_dl[0][indices_tgt], self._tgt_dl[1][indices_tgt]]]
 
     def _construct_discriminator(self, inputs, reuse, trainable):
         with tf.variable_scope(self._discriminator_scope, reuse=reuse):
             prev_dim = self._h_neurons_encoder[-1]
+            layer_idx = 0
             add_layer = self._add_layer
             if self._discriminator_l2_loss is None:
-                self._discriminator_l2_loss = tf.Variable(tf.constant(0.0))
+                self._discriminator_l2_loss = tf.get_variable(initializer=tf.constant(0.0), name="l2_loss")
             if self._discriminator_keep_prob is None:
                 self._discriminator_keep_prob = tf.placeholder(tf.float32)
             h = inputs
             for neurons in self._h_neurons_discriminator:
-                h, self._discriminator_l2_loss = add_layer(h, prev_dim, neurons, act_fun=tf.nn.sigmoid, 
+                h, self._discriminator_l2_loss = add_layer(h, prev_dim, neurons, act_fun=tf.nn.sigmoid, layer_idx=layer_idx,
                         l2_loss=self._discriminator_l2_loss, keep_prob=self._discriminator_keep_prob, trainable=trainable)
                 prev_dim = neurons
-            _disc_o, self._discriminator_l2_loss = add_layer(h, prev_dim, 1, act_fun=tf.nn.sigmoid, 
+                layer_idx += 1
+            _disc_o, self._discriminator_l2_loss = add_layer(h, prev_dim, 2, act_fun=tf.nn.sigmoid,  layer_idx=layer_idx,
                 l2_loss=self._discriminator_l2_loss, keep_prob=self._discriminator_keep_prob, trainable=trainable)
             return _disc_o
 
@@ -189,13 +191,15 @@ class ADDA:
 
     def _train_classifier(self, iterations=10000, batch_sz=64, do_clear=False):
         tf.reset_default_graph()
-        self._construct_tgt_encoder(reuse=False, trainable=True)
+        self._construct_tgt_encoder(reuse=False, trainable=False)
         self._construct_classifier(self._tgt_encoder_yo, self._tgt_encoder_l2_loss, reuse=False, trainable=True)
         self._construct_src_encoder(reuse=False, trainable=True)
-        self._construct_classifier(self._src_encoder_yo, self._src_encoder_l2_loss, reuse=False, trainable=True)
+        self._construct_classifier(self._src_encoder_yo, self._src_encoder_l2_loss, reuse=True, trainable=True)
+        self._classifier_trainer = tf.train.AdamOptimizer(self._opt_step).minimize(self._classifier_loss)
         self._history_classifier = [[],[],[]]
 
         with tf.Session() as self._sess:
+            
             self._sess.run(tf.global_variables_initializer())
             best_acc = -1
             saver_clf = self._try_get_saver(self._classifier_scope, self._path_clf_nn, do_clear)
@@ -225,17 +229,53 @@ class ADDA:
                                   {self._src_encoder_xi:data, self._classifier_y:labels, self._classifier_keep_prob:self._train_keep_prob, self._src_encoder_keep_prob:self._train_keep_prob})
             self._save_nn(saver_tgt_encoder, self._path_tgt_nn)
 
-    def _build_ad_loss(self):
+    def _build_ad_los2s(self):
         disc_s  = self._construct_discriminator(self._src_encoder_yo, reuse=False, trainable=True)
         disc_t = self._construct_discriminator(self._tgt_encoder_yo, reuse=True, trainable=True)
         g_loss = tf.nn.sigmoid_cross_entropy_with_logits(
             logits=disc_t, labels=tf.ones_like(disc_t))
         g_loss = tf.reduce_mean(g_loss) 
-        d_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=disc_s,labels=tf.ones_like(disc_s)))+tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=disc_t,labels=tf.zeros_like(disc_t)))
+        d_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=disc_s,labels=tf.ones_like(disc_s)))+ \
+            tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=disc_t,labels=tf.zeros_like(disc_t)))
+        d_loss = -d_loss;
         self._generator_loss = g_loss + self._tgt_encoder_l2_loss
         self._discriminator_loss = d_loss + self._discriminator_l2_loss
         self._tgt_disc_acc1 = self._softmax_eval_acc(logits=disc_t, labels=tf.ones_like(disc_t))
         self._src_disc_acc1 = self._softmax_eval_acc(logits=disc_s, labels=tf.ones_like(disc_s))
+
+    def _build_ad_loss(self):
+        #disc_s  = self._construct_discriminator(self._src_encoder_yo, reuse=False, trainable=True)
+        #disc_t = self._construct_discriminator(self._tgt_encoder_yo, reuse=True, trainable=True)
+        source_ft = self._src_encoder_yo
+        target_ft = self._tgt_encoder_yo
+
+        adversary_ft = tf.concat([
+            tf.reshape(source_ft, [-1, int(source_ft.get_shape()[-1])])
+            , tf.reshape(target_ft, [-1, int(target_ft.get_shape()[-1])])
+            ], 0)
+
+        source_adversary_label = tf.zeros([tf.shape(source_ft)[0]], tf.int32)
+        target_adversary_label = tf.ones([tf.shape(target_ft)[0]], tf.int32)
+
+        adversary_label = tf.concat(
+            [source_adversary_label, target_adversary_label], 0)
+
+        adversary_logits = self._construct_discriminator(adversary_ft, reuse=False, trainable=True)
+
+        # losses
+        mapping_loss = tf.losses.sparse_softmax_cross_entropy(
+             1-adversary_label, adversary_logits)
+
+        adversary_loss = tf.losses.sparse_softmax_cross_entropy(
+            adversary_label, adversary_logits)
+
+        self._generator_loss = mapping_loss + self._tgt_encoder_l2_loss * 0
+        self._discriminator_loss = adversary_loss + self._discriminator_l2_loss * 0
+        #self._tgt_disc_acc1 = self._softmax_eval_acc(logits=disc_t, labels=tf.ones_like(disc_t))
+        #self._src_disc_acc1 = self._softmax_eval_acc(logits=disc_s, labels=tf.ones_like(disc_s))
+        #self.adversary_label=adversary_label
+        #.adversary_logits=adversary_logits
+
 
     def _softmax_eval_acc(self, logits, labels):
         pred = tf.nn.softmax(logits)
@@ -250,6 +290,7 @@ class ADDA:
         for src_v in src_vars:
             for tgt_v in tgt_vars:
                 if src_v.name[4:] == tgt_v.name[4:]:
+                    #print(src_v.name, tgt_v.name)
                     src_var_val = self._sess.run(src_v)
                     self._sess.run(tgt_v.assign(src_var_val))
 
@@ -263,18 +304,27 @@ class ADDA:
 
     def _train_discriminator(self, iterations=3000, batch_sz=64, do_clear=False):
         tf.reset_default_graph()
-        with tf.Session() as self._sess:
-            self._construct_tgt_encoder(reuse=False, trainable=True)
-            self._construct_src_encoder(reuse=False, trainable=False)
+        self._construct_tgt_encoder(reuse=False, trainable=True)
+        self._construct_src_encoder(reuse=False, trainable=False)
         
-            self._build_ad_loss()
+        self._build_ad_loss()
+
+        with tf.Session() as self._sess:
+
+            #self._check_vars(self._src_encoder_scope)
+            #self._check_vars(self._tgt_encoder_scope)
+            #self._check_vars(self._discriminator_scope, True)
+            #exit(0)
+
+            writer = tf.summary.FileWriter(os.path.join(self._saving_path,'discriminator/log'),self._sess.graph)
+
             tgt_encoder_train_variables = tf.trainable_variables(self._tgt_encoder_scope)
             optimizer_gen = tf.train.AdamOptimizer(learning_rate=self._opt_step,beta1=0.5,
                                                     beta2=0.999).minimize(self._generator_loss,var_list=tgt_encoder_train_variables)
             disc_trainable_variables = tf.trainable_variables(self._discriminator_scope)
             optimizer_disc = tf.train.AdamOptimizer(learning_rate=self._opt_step,beta1=0.5,
                                                     beta2=0.999).minimize(self._discriminator_loss,var_list=disc_trainable_variables)
-        
+
             self._sess.run(tf.global_variables_initializer())
 
             saver_src_encoder = self._try_get_saver(self._src_encoder_scope, self._path_src_nn,  False, 
@@ -282,10 +332,19 @@ class ADDA:
             saver_tgt_encoder, loaded = self._try_get_saver(self._tgt_encoder_scope, self._path_tgt_nn, do_clear, ret_state=True, 
                                                             only_trainable=False)
        
+            saver_discriminator = self._try_get_saver(self._discriminator_scope, self._path_dsc_nn, do_clear)
+            
+
+            #self._check_vars(self._src_encoder_scope, True)
+            #self._check_vars(self._tgt_encoder_scope, True)
+            #return None
             if not loaded:
                 print("_copy_encoder")
                 self._copy_encoder()
-            saver_discriminator = self._try_get_saver(self._discriminator_scope, self._path_dsc_nn, do_clear)
+            #self._check_vars(self._src_encoder_scope, True)
+            #self._check_vars(self._tgt_encoder_scope, True)
+            #self._save_nn(saver_tgt_encoder, self._path_tgt_nn)
+            #return None
             for i in range(iterations):
                 [src_dl, tgt_dl] = self._next_batch_discriminator(batch_sz)
                 dict = {self._tgt_encoder_xi: tgt_dl[0], self._src_encoder_xi: src_dl[0], 
@@ -294,17 +353,30 @@ class ADDA:
                 dict[self._tgt_encoder_keep_prob] = 1.0
                 dict[self._discriminator_keep_prob] = self._train_keep_prob
                 optimizer_disc.run(feed_dict=dict)
-                if i % 1000 == 0:
+                if i % 100 == 0:
                     dict[self._discriminator_keep_prob] = 1.0
+
+                    #self._copy_encoder()
+                    #print(" self._tgt_encoder_yo=",self._sess.run( self._tgt_encoder_yo, feed_dict=dict))
+                   
+
+                    #print("self._tgt_encoder_xi=",self._sess.run(self._tgt_encoder_xi, feed_dict=dict))
+
+                    #print("self.disc_s=",self._sess.run(self.disc_s, feed_dict=dict))
+                    #print("self.disc_t=",self._sess.run(self.disc_t, feed_dict=dict))
+                    #print("self.adversary_label=", self._sess.run(self.adversary_label, feed_dict=dict))
+                    #print("self.adversary_logits=", self._sess.run(self.adversary_logits, feed_dict=dict))
+
                     gen_loss = self._generator_loss.eval(feed_dict=dict)
                     disc_loss = self._discriminator_loss.eval(feed_dict=dict)
-                    tgt1 = self._tgt_disc_acc1.eval(feed_dict=dict)
-                    src1 = self._src_disc_acc1.eval(feed_dict=dict)
-                    print("it:", i, 'gen_loss=',gen_loss,'disc_loss=',disc_loss,'target1=',tgt1, 'source1=',src1)
+                    #tgt1 = self._tgt_disc_acc1.eval(feed_dict=dict)
+                    #src1 = self._src_disc_acc1.eval(feed_dict=dict)
+                    print("it:", i, 'gen_loss=',gen_loss,'disc_loss=',disc_loss,'target1=' #,tgt1, 'source1=',src1
+                          )
                     self._histories_discriminator[0].append(gen_loss)
                     self._histories_discriminator[1].append(disc_loss)
-                    self._histories_discriminator[2].append(tgt1)
-                    self._histories_discriminator[3].append(src1)
+                    #self._histories_discriminator[2].append(tgt1)
+                    #self._histories_discriminator[3].append(src1)
             self._save_nn(saver_tgt_encoder, self._path_tgt_nn)
             self._save_nn(saver_discriminator, self._path_dsc_nn)
 
@@ -318,12 +390,19 @@ class ADDA:
             src_encoder_classifier_y = self._classifier_y
 
             self._construct_tgt_encoder(reuse=False, trainable=False)
-            self._construct_classifier(self._tgt_encoder_yo, self._tgt_encoder_l2_loss, reuse=False, trainable=False)
+            self._construct_classifier(self._tgt_encoder_yo, self._tgt_encoder_l2_loss, reuse=tf.AUTO_REUSE, trainable=False)
             tgt_encoder_acc = self._classifier_acc
             tgt_encoder_feed_dict={self._classifier_keep_prob:1.0, self._tgt_encoder_keep_prob:1.0}
             tgt_encoder_classifier_y = self._classifier_y
         
             self._sess.run(tf.global_variables_initializer())
+
+            #self._check_vars(self._src_encoder_scope, True)
+            #self._check_vars(self._tgt_encoder_scope, True)
+
+            #self._check_vars(self._classifier_scope)
+
+            #exit(0)
 
             saver_src_encoder = self._try_get_saver(self._src_encoder_scope, self._path_src_nn,  False, 
                                                     "Cannot find source encoder parameters")
@@ -331,8 +410,11 @@ class ADDA:
                                                     "Cannot find classifier parameters")
             saver_tgt_encoder = self._try_get_saver(self._tgt_encoder_scope, self._path_tgt_nn,  False, 
                                                     "Cannot find target encoder parameters")
+            #self._copy_encoder()
 
-            self._copy_classifier()
+            #self._check_vars(self._src_encoder_scope, True)
+            #self._check_vars(self._tgt_encoder_scope, True)
+            #self._copy_classifier()
 
             src_encoder_feed_dict.update({self._src_encoder_xi:self._src_test_dl[0], src_encoder_classifier_y:self._src_test_dl[1]})
             test_acc_src = src_encoder_acc.eval(feed_dict=src_encoder_feed_dict)
@@ -349,13 +431,13 @@ class ADDA:
               iterations = 20000, batch_sz=64, do_clear=False):
 
         if train_net & ADDA.Classifier != 0:
-            print("Classifier Training Start")
+            print("\n\nClassifier Training Start")
             self._train_classifier(iterations, batch_sz, do_clear)
         if train_net & ADDA.Discriminator != 0:
-            print("Discriminator Training Start")
+            print("\n\nDiscriminator Training Start")
             self._train_discriminator(iterations, batch_sz, do_clear)
         if train_net & ADDA.DomainAdapt != 0:
-            print("Domain Adaptation Start")
+            print("\n\nDomain Adaptation Start")
             self._domain_adaptation()
 
     def _check_vars(self, scope, output_val=False):
@@ -440,9 +522,13 @@ def _test_train():
     to_prt = []
     iterations=30000
     batch_sz = 256
-    adda = ADDA(global_defs.mk_dir( os.path.join(global_defs.PATH_SAVING, 'ADDA_test')), [dl_src, dl_tgt])
+    adda = ADDA(global_defs.mk_dir( os.path.join(global_defs.PATH_SAVING, 'ADDA_test')), 
+                [dl_src, dl_tgt], opt_step=0.0001, h_neurons_discriminator=[200])
 
-    adda.train(ADDA.Discriminator | ADDA.DomainAdapt, 100)
+    #adda.train(ADDA.Classifier, iterations=300000)
+    #adda.train(ADDA.Discriminator, iterations=1)
+    adda.train(ADDA.Discriminator | ADDA.DomainAdapt, iterations=10)
+    #adda.train( ADDA.DomainAdapt, iterations=1)
     print('\n')
     #adda._domain_adaptation_tgt_encoder()
 
@@ -453,3 +539,49 @@ if __name__=='__main__':
     #_test_domain_adaptation()
     _test_train()
 
+
+
+    '''
+src_encoder/l2_loss:0
+src_encoder/Variable:0
+src_encoder/w0:0
+src_encoder/b0:0
+src_encoder/Variable_1:0
+src_encoder/w1:0
+src_encoder/b1:0
+tgt_encoder/l2_loss:0
+tgt_encoder/Variable:0
+tgt_encoder/w0:0
+tgt_encoder/b0:0
+tgt_encoder/Variable_1:0
+tgt_encoder/w1:0
+tgt_encoder/b1:0
+tgt_encoder/w0/Adam:0
+tgt_encoder/w0/Adam_1:0
+tgt_encoder/b0/Adam:0
+tgt_encoder/b0/Adam_1:0
+tgt_encoder/w1/Adam:0
+tgt_encoder/w1/Adam_1:0
+tgt_encoder/b1/Adam:0
+tgt_encoder/b1/Adam_1:0
+
+DomainAdapt
+src_encoder/l2_loss:0
+src_encoder/Variable:0
+src_encoder/w0:0
+src_encoder/b0:0
+src_encoder/Variable_1:0
+src_encoder/w1:0
+src_encoder/b1:0
+src_encoder/l2_loss/Adam:0
+src_encoder/l2_loss/Adam_1:0
+tgt_encoder/l2_loss:0
+tgt_encoder/Variable:0
+tgt_encoder/w0:0
+tgt_encoder/b0:0
+tgt_encoder/Variable_1:0
+tgt_encoder/w1:0
+tgt_encoder/b1:0
+tgt_encoder/l2_loss/Adam:0
+tgt_encoder/l2_loss/Adam_1:0
+    '''
