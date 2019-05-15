@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import pickle
 import math
 import csv
+from sklearn.manifold import TSNE
 
 
 def read_mnist(one_hot=True):
@@ -101,6 +102,7 @@ def index_split(num, percent1):
 
 
 def labeled_data_split(labeled_data, percent_train=0.6):
+    np.random.seed(0)
     train_idx, test_idx = index_split(labeled_data[0].shape[0], percent_train)
     train_ld = [labeled_data[0][train_idx], labeled_data[1][train_idx]]
     test_ld = [labeled_data[0][test_idx], labeled_data[1][test_idx]]
@@ -123,9 +125,32 @@ def labels2one_hot(labels):
     return labels
 
 
+def visualize_da(src_data, tgt_data_ori, tgt_data_adpted, title=None):
+    src_data, _ = rand_arr_selection(src_data, max(100, src_data.shape[0]))
+    tgt_data_ori, _ = rand_arr_selection(tgt_data_ori, max(100, src_data.shape[0]))
+    tgt_data_adpted, _ = rand_arr_selection(tgt_data_adpted, max(100, src_data.shape[0]))
+    div_idx1 = src_data.shape[0]
+    div_idx2 = div_idx1 + tgt_data_ori.shape[0]
+    tsne = TSNE(n_components=2, n_iter=500).fit_transform(np.vstack([src_data, tgt_data_ori, tgt_data_adpted]))
+    plt.scatter(tsne[:div_idx1, 0], tsne[:div_idx1, 1], c='b', label='Source Data')
+    plt.scatter(tsne[div_idx1:div_idx2, 0], tsne[div_idx1:div_idx2, 1], c='r', label='Target Data(Original)')
+    plt.scatter(tsne[div_idx2:, 0], tsne[div_idx2:, 1], c='g', label='Target Data(Adapted)')
+    plt.legend(loc = 'upper left')
+    if title is not None:
+        plt.title(title)
+    plt.show()
+
+
+def _test_visualize_da():
+    a = np.array([[1,2,3],[5,4,1],[3,4,1],[6,9,1],[1,0,3]])
+    labels = np.array([1,0,0,1,0])
+    visualize_da(a[:2], a[2:] )
+
+
 def shuffle_labeled_data(dl):
     data, labels = dl
     a = np.arange(labels.shape[0])
+    np.random.seed(0)
     np.random.shuffle(a)
     return [data[a], labels[a]]
 
@@ -149,4 +174,4 @@ def _test_labels_one_hot():
 
 
 if __name__ == '__main__':
-    _test_read_paired_labeled_features()
+    _test_visualize_da()
