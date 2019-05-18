@@ -1,3 +1,9 @@
+# -*- coding: utf-8 -*-
+"""
+@Author: Zhixin Ling
+@Description: Part of the project of Data Science: Implementation of adda network (slim version).
+            Batch normalization is supported in the codes.
+"""
 import tensorflow as tf
 import numpy as np
 import pickle as pkl

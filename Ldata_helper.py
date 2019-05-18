@@ -12,11 +12,39 @@ import pickle
 import math
 import csv
 from sklearn.manifold import TSNE
+import gzip
+from scipy.io import loadmat
+
+
+def read_gened_da_dls():
+    xyz = np.random.uniform(0.0,5.0,[500, 3])
+    xyz_ = xyz.copy()
+    xyz_[:,0] += 1.0
+    xyz_[:,1] -= 1.0
+    #xyz_trans = 
+
+
+def read_usps_dl():
+    m1 = loadmat(global_defs.PATH_USPS1)
+    m2 = loadmat(global_defs.PATH_USPS2)
+    data = np.vstack([m1['traindata'], m2['testdata']])
+    labels = np.vstack([m1['traintarg'], m2['testtarg']])
+    data /= 2
+    data += 0.5
+    labels[labels < 0.0] = 0.0
+    return [data, labels]
 
 
 def read_mnist(one_hot=True):
     from tensorflow.examples.tutorials.mnist import input_data
     return input_data.read_data_sets(os.path.join(global_defs.PATH_MNIST),one_hot=one_hot)
+
+
+def read_mnist_dl():
+    mnist = read_mnist()
+    data = np.vstack([mnist.train.images, mnist.test.images])
+    labels = np.vstack([mnist.train.labels, mnist.test.labels])
+    return [data, labels]
 
 
 def posfix_filename(filename, postfix):
@@ -125,10 +153,17 @@ def labels2one_hot(labels):
     return labels
 
 
-def visualize_da(src_data, tgt_data_ori, tgt_data_adpted, title=None):
-    src_data, _ = rand_arr_selection(src_data, max(100, src_data.shape[0]))
-    tgt_data_ori, _ = rand_arr_selection(tgt_data_ori, max(100, src_data.shape[0]))
-    tgt_data_adpted, _ = rand_arr_selection(tgt_data_adpted, max(100, src_data.shape[0]))
+def visualize_da(src_data, tgt_data_ori, tgt_data_adpted, title=None, figname=None):
+    plt.figure(figsize=(15,10))
+    if tgt_data_ori is None:
+        visualize_da2(src_data, tgt_data_adpted, 'adapted', title, figname)
+        return None
+    elif tgt_data_adpted is None:
+        visualize_da2(src_data, tgt_data_ori, 'original', title, figname)
+        return None
+    src_data, _ = rand_arr_selection(src_data, min(300, src_data.shape[0]))
+    tgt_data_ori, _ = rand_arr_selection(tgt_data_ori, min(300, tgt_data_ori.shape[0]))
+    tgt_data_adpted, _ = rand_arr_selection(tgt_data_adpted, min(300, tgt_data_adpted.shape[0]))
     div_idx1 = src_data.shape[0]
     div_idx2 = div_idx1 + tgt_data_ori.shape[0]
     tsne = TSNE(n_components=2, n_iter=500).fit_transform(np.vstack([src_data, tgt_data_ori, tgt_data_adpted]))
@@ -138,7 +173,27 @@ def visualize_da(src_data, tgt_data_ori, tgt_data_adpted, title=None):
     plt.legend(loc = 'upper left')
     if title is not None:
         plt.title(title)
-    plt.show()
+    if figname is None:
+        plt.show()
+    else:
+        plt.savefig(figname)   
+
+
+def visualize_da2(src_data, tgt_data, tgt_label, title=None, figname=None):
+    src_data, _ = rand_arr_selection(src_data, min(300, src_data.shape[0]))
+    tgt_data, _ = rand_arr_selection(tgt_data, min(300, tgt_data.shape[0]))
+    div_idx1 = src_data.shape[0]
+    tsne = TSNE(n_components=2, n_iter=500).fit_transform(np.vstack([src_data, tgt_data]))
+    plt.scatter(tsne[:div_idx1, 0], tsne[:div_idx1, 1], c='b', label='Source Data')
+    plt.scatter(tsne[div_idx1:, 0], tsne[div_idx1:, 1], c='r', label='Target Data(' + tgt_label + ')')
+
+    plt.legend(loc = 'upper left')
+    if title is not None:
+        plt.title(title)
+    if figname is None:
+        plt.show()
+    else:
+        plt.savefig(figname)   
 
 
 def _test_visualize_da():
