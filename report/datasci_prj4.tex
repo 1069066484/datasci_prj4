@@ -379,6 +379,17 @@ Besides, specifically for ADDA, we found the discriminator can really grow too p
 
 And, it should be noticed that the visualization doesn't show an obvious effect after domain adaptation and the performance gain using domain adaptation is also poor, $0.004 \leq g \leq 0.013$. We think there can still be room for improvement.
 
+\subsection{Theory of Batch Normalization}
+From ADDA experiments, we can see batch normalization really make a learning process converge easier and faster(refer to figure \ref{fig:Ex3} and \ref{fig:ExA}). Method of batch normalization is proposed in Sergey Ioffe et al.'s work \cite{BN1}.
+
+Batch normalization is used before activation function applied to the output of a layer. Assuming that every batch fed for the network satisfy a distribution $d_0(x, \theta_0)$, with the network forwarding, the distribution changes into $d_1(x, \theta_1), d_2(x, \theta_2), \cdots, d_i(x, \theta_i)$ and goes far away from the Y-axis, which is named internal covariate shift in Sergey Ioffe et al.'s work\cite{BN1}, as illustrated in the left subfigure of figure \ref{fig:BN_theorem1}. Supposing sigmoid function is used for activation, the gradients will become flat, making it difficult for update of parameters using SGD method.
+\begin{figure}
+  \centering
+  \includegraphics[width=.4\textwidth]{LBN_theorem1.jpg}
+  \caption{Problem of Internal Covariate Shift}
+  \label{fig:BN_theorem1}
+\end{figure}
+As a result, we normalize the output $\mathbf{x}$ to normal distribution. But, that is not done because distribution of $\mathbf{x}$ is constrained to Gaussian. So a linear transformation, scale and shift, is applied to keep the feature of $\mathbf{x}$'s original distribution. Intuitively, batch normalization aims to pull $\mathbf{x}$ back to where gradients of the activation function work to accelerate the convergence process.
 
 \section{Conclusion}
 Conclusions.
@@ -393,6 +404,8 @@ sentence punctuation follows the bracket \cite{b2}.
 \bibitem{ADDA1} Eric Tzeng, Judy Hoffman, Kate Saenko and Trevor Darrel, ``Adversarial Discriminative Domain Adaptation''.
 \bibitem{DANN1} Yaroslav Ganin, Evgeniya Ustinova, Hana Ajakan, Pascal Germain, Hugo Larochelle, Francois Laviolette,
     Mario Marchand, Victor Lempitsky, ``Domain-Adversarial Training of Neural Networks''.
+\bibitem{BN1} Sergey Ioffe, Christian Szegedy, ``Batch Normalization: Accelerating Deep Network Training by Reducing Internal Covariate Shift''.
+    
 \end{thebibliography}
 \vspace{12pt}
 \color{red}
