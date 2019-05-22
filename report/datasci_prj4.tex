@@ -99,7 +99,7 @@ According to work of Eric Tzeng, et al., we can divide the way the model runs in
       Our approach is not always quite standard as Eric Tzeng's work. Except that we use fully connected layers instead of CNN for our $X_s$ and $X_t$, we also initialized parameters of $M_t$ using pre-trained $M_s$'s. This is not mentioned in the paper and it is not likely to be feasible in most cases. We can do so because our structure of $M_s$ is designed to be the same as $M_t$. And the measure really help a lot.
   \item Testing. In this stage, we feed $M_t(X_t)$ for $C$ and evaluate the classification accuracy.
 \end{enumerate}
-    During our practice, we combined the last two stages into one, just say adversarial adaptation.
+    With our practice, we combined the last two stages into one, just say adversarial adaptation. ADDA method is just like trying to encode the target domain data, $M_t(X_t)$, to match the distribution of encoded source domain data, $M_s(X_s)$ so that the classifier working on source domain data can also work on target domain data.
 
 
 
@@ -112,10 +112,10 @@ Yaroslav Ganin, et al. proposed a representation learning approach for domain ad
   \caption{DANN Overview: An overview of standard DANN architecture.}
   \label{DANN_overview}
 \end{figure*}
-The general architecture is presented in figure \ref{DANN_overview}; it's simpler than ADDA. Domain classifier $G$ of DANN performs similar function as discriminator $D$ of ADDA does. DANN is similar to ADDA but target encoder and source encoder share the same weight weights. In other words, only one feature encoder, $M$, is used within DANN. Thus, we do not go to details of components of DANN and just simply present the way the DANN model work. We will use similar representations as ADDA to make things easy to understand (although they may not be Yaroslav Ganin et al.'s symbols).
+The general architecture is presented in figure \ref{DANN_overview}; it's simpler than ADDA. Domain classifier $D$ of DANN performs similar function as discriminator $D$ of ADDA does. DANN is similar to ADDA but target encoder and source encoder share the same weight weights. In other words, only one feature encoder, $M$, is used within DANN. Thus, we do not go to details of components of DANN and just simply present the way the DANN model work. We will use similar representations as ADDA to make things easy to understand (although they may not be Yaroslav Ganin et al.'s symbols).
 \begin{enumerate}
   \item Pre-training. In this stage, we optimize $M$ and $C$ to minimize $L_{C}$.
-  \item Adversarial adaptation. In this stage, we feed both $X_s$ and $X_t$ for $M$. By fixing $C$, we optimize $M$ and $G$ to minimize $L_{da}$:
+  \item Adversarial adaptation. In this stage, we feed both $X_s$ and $X_t$ for $M$. By fixing $C$, we optimize $M$ and $D$ to minimize $L_{da}$:
       \begin{equation}\label{dann_da}
         \begin{aligned}
         L_{da} & (X_{s}, X_{t}, M) =  \\
@@ -125,14 +125,14 @@ The general architecture is presented in figure \ref{DANN_overview}; it's simple
                             \sum\limits_{k=1}^{K} \mathbb{I}_{[k=y_s]} \log C(M(X_{s}))
         \end{aligned}
       \end{equation}
-      Unlike ADDA, parameters of $M$ and $G$ are updated at the same time. And the loss, $L_{da}$ of DANN is combination of both $L_C$ and $L_D$ of ADDA. There is subtle difference between ADDA and DANN in this stage. $C_{da}$ is a balance factor for classification loss and discriminator loss. $c_{da}$ is not mentioned in the paper, but we use it and find it helps improve our model.
+      Unlike ADDA, parameters of $M$ and $D$ are updated at the same time. And the loss, $L_{da}$ of DANN is combination of both $L_C$ and $L_D$ of ADDA. There is subtle difference between ADDA and DANN in this stage. $C_{da}$ is a balance factor for classification loss and discriminator loss. $c_{da}$ is not mentioned in the paper, but we use it and find it helps improve our model. We use $c_{da}=2.0$.
   \item Testing. In this stage, we feed $M(X_t)$ for $C$ and evaluate the classification accuracy.
 \end{enumerate}
-Also, we combined stage of adversarial adaptation and testing together as adversarial adaptation.
+Also, we combined stage of adversarial adaptation and testing together as adversarial adaptation. Compared to ADDA method that tries to bring $M_t(X_t)$ to $M_s(X_s)$ as closer as possible, DANN method is just like trying to adjust a well-trained source domain encoder $M_s$ to work on target domain data, $X_t$.
 
 \section{Experiments And Results}
-\subsection{ADDA Experiment}
-We will present six experiments in this part. We use fully connected networks (FCNs) to construct the four subnetworks. First we show some common parameters of all of these experiments in table \ref{tab:SymADDA}. We split both $X_s$ and $X_t$ into training set, $X^{tr}_s$ and $X^{tr}_t$, and test set, $X^{te}_s$ and $X^{te}_t$. $X^{tr}_s$ is used to train ADDA the first stage and $X^{te}_s$ is used to select the best parameters of $M_s$ and $C$ correspondingly, preventing overfitting. $X^{te}_t$ is used to train ADDA the second stage and $X^{te}_t$ is used to select the best parameters of $M_t$ and $D$ correspondingly, also preventing overfitting. It should be mentioned that both $X^{te}_t$ and $X^{te}_t$ are unlabeled.
+\subsection{ADDA Experiments}
+We will present six experiments in this part. We use fully connected networks (FCNs) to construct the four subnetworks. First we show some common parameters of all of these experiments in table \ref{tab:SymADDA}. We split both $X_s$ and $X_t$ into training set, $X^{tr}_s$ and $X^{tr}_t$, and test set, $X^{te}_s$ and $X^{te}_t$. $X^{tr}_s$ is used to train ADDA the first stage and $X^{te}_s$ is used to select the best parameters of $M_s$ and $C$ correspondingly, preventing overfitting. $X^{te}_t$ is used to train ADDA the second stage and $X^{te}_t$ is used to select the best parameters of $M_t$ and $D$ correspondingly, also preventing overfitting. It should be mentioned that both $X^{te}_t$ and $X^{tr}_t$ are unlabeled.
  \begin{table}[h]
 	\centering
 	\caption{Hyper-parameters of ADDA}
@@ -161,17 +161,17 @@ We will present six experiments in this part. We use fully connected networks (F
 	\centering
 	\caption{Different Configurations And Resulted Performances of ADDA Experiments}
 	\label{tab:ConfigADDA}
-	\begin{tabular}{ccccccccc}
+	\begin{tabular}{cccccccccc}
 		\hline
-		Sym & Src & PT & AN & BN & $Ac(M_s(X^{te}_s))^*$ & $Ac(M_s(X^{te}_t))^*$ & $Ac(M_t(X^{tr}_t))^*$ & $Ac(M_t(X^{te}_t))^*$\\
+		Sym & Src & PT & AN & BN & $Ac(M_s(X^{te}_s))^*$ & $Ac(M_s(X^{te}_t))^*$ & $Ac(M_t(X^{tr}_t))^*$ & $Ac(M_t(X^{te}_t))^*$ & g\\
 		\hline
 		\hline
-        $Ex1$ & Art & $\times$ & $\times$ & $\times$ & 0.6074 & 0.5080 & 0.0222 & 0.0189 \\
-		$Ex2$ &  Art & \checkmark & $\times$ & $\times$ & 0.6818 & 0.5712 & 0.5897 & 0.5821 \\
-		$Ex3$ &  Art & \checkmark & \checkmark & $\times$ & 0.6488 & 0.6223 & 0.6551 & 0.6372\\
-		$Ex_A$ &  Art & \checkmark & \checkmark & \checkmark & 0.7893 & 0.7313 & 0.7621 & 0.7354\\
-		$Ex_C$ &  Clipart & \checkmark & \checkmark & \checkmark & 0.8624 & 0.6561 & 0.6646 & 0.6636\\
-		$Ex_P$ &  Product & \checkmark & \checkmark & \checkmark & 0.9391 & 0.7313 & 0.7556 & 0.7353\\
+        $Ex1$ & Art & $\times$ & $\times$ & $\times$ & 0.6074 & 0.5080 & 0.0222 & 0.0189  & -0.4891\\
+		$Ex2$ &  Art & \checkmark & $\times$ & $\times$ & 0.6818 & 0.5712 & 0.5897 & 0.5821 & 0.0109\\
+		$Ex3$ &  Art & \checkmark & \checkmark & $\times$ & 0.6488 & 0.6223 & 0.6551 & 0.6372 & 0.0149\\
+		$Ex_A$ &  Art & \checkmark & \checkmark & \checkmark & 0.7893 & 0.7313 & 0.7621 & 0.7354 & 0.0041\\
+		$Ex_C$ &  Clipart & \checkmark & \checkmark & \checkmark & 0.8624 & 0.6561 & 0.6646 & 0.6636 & 0.0075\\
+		$Ex_P$ &  Product & \checkmark & \checkmark & \checkmark & 0.9391 & 0.7313 & 0.7556 & 0.7353 & 0.0040\\
 		\hline
 	\end{tabular}
 \end{table*}
@@ -191,102 +191,193 @@ To solve the problem, we tried method of batch normalization, as illustrated in 
 
 We show figures \ref{fig:ExC} and \ref{fig:ExP} for completeness of our study. It seems domain adaptation does not work so well when it comes to transfer art dataset into real world dataset compared to clipart and product dataset thought the classifier works the best on the source dataset. We think it is because there exists a larger different between the two domains, real world and clipart.
 \begin{figure*}[htb]
-\label{fig:Ex1}
+
 \centering
-\begin{minipage}[t]{0.3\textwidth}
-\includegraphics[width=1.9in, height=1.5in]{Ladda/A2R_no_preassign_no_dec_no_bn/ADDA_visual.png}
+\begin{minipage}[t]{0.26\textwidth}
+\includegraphics[width=1.6in, height=1.5in]{Ladda/A2R_no_preassign_no_dec_no_bn/ADDA_visual.png}
 \end{minipage}%
-\begin{minipage}[t]{0.3\textwidth}
-\includegraphics[width=1.9in, height=1.5in]{Ladda/A2R_no_preassign_no_dec_no_bn/clf.png}
+\begin{minipage}[t]{0.26\textwidth}
+\includegraphics[width=1.6in, height=1.5in]{Ladda/A2R_no_preassign_no_dec_no_bn/clf.png}
 \end{minipage}%
 \begin{minipage}[t]{0.45\textwidth}
 \includegraphics[width=3.5in, height=1.5in]{Ladda/A2R_no_preassign_no_dec_no_bn/gan.png}
 \end{minipage}%
-\caption{Visualization of Ex1 Result}
+\caption{Visualization of ADDA Ex1 Result}\label{fig:Ex1}
 \end{figure*}
 
 \begin{figure*}[htb]
-\label{fig:Ex2}
+
 \centering
-\begin{minipage}[t]{0.3\textwidth}
-\includegraphics[width=1.9in, height=1.5in]{Ladda/A2R_no_dec_no_bn/ADDA_visual.png}
+\begin{minipage}[t]{0.26\textwidth}
+\includegraphics[width=1.6in, height=1.5in]{Ladda/A2R_no_dec_no_bn/ADDA_visual.png}
 \end{minipage}%
-\begin{minipage}[t]{0.3\textwidth}
-\includegraphics[width=1.9in, height=1.5in]{Ladda/A2R_no_dec_no_bn/clf.png}
+\begin{minipage}[t]{0.26\textwidth}
+\includegraphics[width=1.6in, height=1.5in]{Ladda/A2R_no_dec_no_bn/clf.png}
 \end{minipage}%
 \begin{minipage}[t]{0.45\textwidth}
 \includegraphics[width=3.5in, height=1.5in]{Ladda/A2R_no_dec_no_bn/gan.png}
 \end{minipage}%
-\caption{Visualization of Ex2 Result}
+\caption{Visualization of ADDA Ex2 Result}\label{fig:Ex2}
 \end{figure*}
 
 \begin{figure*}[htb]
-\label{fig:Ex3}
+
 \centering
-\begin{minipage}[t]{0.3\textwidth}
-\includegraphics[width=1.9in, height=1.5in]{Ladda/A2R_no_bn/ADDA_visual.png}
+\begin{minipage}[t]{0.26\textwidth}
+\includegraphics[width=1.6in, height=1.5in]{Ladda/A2R_no_bn/ADDA_visual.png}
 \end{minipage}%
-\begin{minipage}[t]{0.3\textwidth}
-\includegraphics[width=1.9in, height=1.5in]{Ladda/A2R_no_bn/clf.png}
+\begin{minipage}[t]{0.26\textwidth}
+\includegraphics[width=1.6in, height=1.5in]{Ladda/A2R_no_bn/clf.png}
 \end{minipage}%
 \begin{minipage}[t]{0.45\textwidth}
 \includegraphics[width=3.5in, height=1.5in]{Ladda/A2R_no_bn/gan.png}
 \end{minipage}%
-\caption{Visualization of Ex3 Result}
+\caption{Visualization of ADDA Ex3 Result}\label{fig:Ex3}
 \end{figure*}
 
 \begin{figure*}[htb]
-\label{fig:ExA}
+
 \centering
-\begin{minipage}[t]{0.3\textwidth}
-\includegraphics[width=1.9in, height=1.5in]{Ladda/std_A2R/ADDA_visual.png}
+\begin{minipage}[t]{0.26\textwidth}
+\includegraphics[width=1.6in, height=1.5in]{Ladda/std_A2R/ADDA_visual.png}
 \end{minipage}%
-\begin{minipage}[t]{0.3\textwidth}
-\includegraphics[width=1.9in, height=1.5in]{Ladda/std_A2R/clf.png}
+\begin{minipage}[t]{0.26\textwidth}
+\includegraphics[width=1.6in, height=1.5in]{Ladda/std_A2R/clf.png}
 \end{minipage}%
 \begin{minipage}[t]{0.45\textwidth}
 \includegraphics[width=3.5in, height=1.5in]{Ladda/std_A2R/gan.png}
 \end{minipage}%
-\caption{Visualization of ExA Result}
+\caption{Visualization of ADDA ExA Result}\label{fig:ExA}
 \end{figure*}
 
 \begin{figure*}[htb]
-\label{fig:ExC}
+
 \centering
-\begin{minipage}[t]{0.3\textwidth}
-\includegraphics[width=1.9in, height=1.5in]{Ladda/std_C2R/ADDA_visual.png}
+\begin{minipage}[t]{0.26\textwidth}
+\includegraphics[width=1.6in, height=1.5in]{Ladda/std_C2R/ADDA_visual.png}
 \end{minipage}%
-\begin{minipage}[t]{0.3\textwidth}
-\includegraphics[width=1.9in, height=1.5in]{Ladda/std_C2R/clf.png}
+\begin{minipage}[t]{0.26\textwidth}
+\includegraphics[width=1.6in, height=1.5in]{Ladda/std_C2R/clf.png}
 \end{minipage}%
 \begin{minipage}[t]{0.45\textwidth}
 \includegraphics[width=3.5in, height=1.5in]{Ladda/std_C2R/gan.png}
 \end{minipage}%
-\caption{Visualization of ExC Result}
+\caption{Visualization of ADDA ExC Result}\label{fig:ExC}
 \end{figure*}
 
 \begin{figure*}[htb]
-\label{fig:ExP}
+
 \centering
-\begin{minipage}[t]{0.3\textwidth}
-\includegraphics[width=1.9in, height=1.5in]{Ladda/std_P2R/ADDA_visual.png}
+\begin{minipage}[t]{0.26\textwidth}
+\includegraphics[width=1.6in, height=1.5in]{Ladda/std_P2R/ADDA_visual.png}
 \end{minipage}%
-\begin{minipage}[t]{0.3\textwidth}
-\includegraphics[width=1.9in, height=1.5in]{Ladda/std_P2R/clf.png}
+\begin{minipage}[t]{0.26\textwidth}
+\includegraphics[width=1.6in, height=1.5in]{Ladda/std_P2R/clf.png}
 \end{minipage}%
 \begin{minipage}[t]{0.45\textwidth}
 \includegraphics[width=3.5in, height=1.5in]{Ladda/std_P2R/gan.png}
 \end{minipage}%
-\caption{Visualization of ExP Result}
+\caption{Visualization of ADDA ExP Result}\label{fig:ExP}
 \end{figure*}
 
 
+\subsection{DANN Experiments}
+We present three experiments using DANN method. Because of time issue, we did not design DANN experiments that sophisticatedly, but we learned a lot from ADDA experiments. Common hyper-parameters are listed in table \ref{tab:SymDANN}. Tricks of L2 normalization and neuron dropout are not used in the experiments because these tricks did not perform that well as expected in the previous experiments of DANN. And we use sigmoid function for activation of hidden layers. Also, a softmax layer is added after the output layer before calculating cross entropy. Batch normalization is not applied in DANN experiments. DANN networks we designed are much simpler and more light-weighted. Learning rate, $l_r$, of both two stages anneals according to the formula: $l_r= \frac{0.00004}{ (1.0 + \frac{1.0 \times i}{I})^{0.75}}$, where $i$ is the current iteration. Primitive of the formula was proposed in Yaroslav Ganin, et al.'s work. We just adjust some factors according to our preliminary experiments.
+ \begin{table}[h]
+	\centering
+	\caption{Hyper-parameters of DANN}
+	\label{tab:SymDANN}
+	\begin{tabular}{ccc}
+		\hline
+		Symbol & Value & Description \\
+		\hline
+		\hline
+        $K$ & $65$ & Number of classes \\
+		$b$ & $256$ & Batch size \\
+		$l_e$ & ${2048,1024}$ & Layers of $M$ \\
+		$l_c$ & ${256,K}$ & Layers of $C$, connected from o$M$  \\
+		$l_d$ & ${512,512,2}$ & Layers of $D$, connected from $M$ \\
+        $p_k$ & $0.0$ & Dropout probability of a neuron. \\
+        $r^{tr}_{s}$ & $0.75$ & Ratio of $X_s$ used as training set.\\
+        $r^{tr}_{t}$ & $0.75$ & Ratio of $X_t$ used as training set.  \\
+        $I$ & $8000$ & Total iterations of first two training stages.   \\
+		\hline
+	\end{tabular}
+\end{table}
+
+
+ \begin{table*}[h]
+	\centering
+	\caption{Different Configurations And Resulted Performances of DANN Experiments}
+	\label{tab:ConfigDANN}
+	\begin{tabular}{ccccccc}
+		\hline
+		Sym & Src & $Ac(M_s(X^{te}_s))^*$ & $Ac(M_s(X^{te}_t))^*$ & $Ac(M_t(X^{tr}_t))^*$ & $Ac(M_t(X^{te}_t))^*$ & g\\
+		\hline
+		\hline
+		$Ex_A$ &  Art & 0.8020 & 0.7172 & 0.7488 & 0.7301 & 0.0129\\
+		$Ex_C$ &  Clipart & 0.8671 & 0.6501 & 0.6683 & 0.6547 & 0.0046\\
+		$Ex_P$ &  Product &  0.9596 & 0.7328 & 0.7411 & 0.7392 & 0.0064\\
+		\hline
+	\end{tabular}
+\end{table*}
+We first present an overview of all of the three DANN experiments in table \ref{tab:ConfigDANN}. Different from ADDA model, we have only one encoder $M$ in DANN. $M$ is trained with $(X_s, Y_x)$ in the first stage and then trained to adapt target domain in the second stage. Thus, to maintain consistency of our symbols, we use $M_s$ to represent the encoder after the first-stage training and $M_t$ to represent the encoder after the second-stage training.
+
+Compared with the results of ADDA shown in the last three rows of table \ref{tab:ConfigADDA}, except the first-stage trained classification accuracies towards source test set, $Ac(M_s(X^{te}_s))^*$, show better performances, the other three indicators fall. The classifier works better with source domain dataset after pre-training but doesn't show such improvement when it comes to classify adapted target domain data.
+
+Figures \ref{fig:ExA2}, \ref{fig:ExC2}, \ref{fig:ExP2} shows visualization of the three DANN experiments. The are four subfigures in each figure. The first two subfigures illustrate visualization of encoded source and target data distribution before($M_s(X^{te}_s)$, $M_s(X^{te}_t)$) and after($M_t(X^{te}_s)$, $M_t(X^{te}_t)$) domain adaptation. The third subfigure shows training history of the classifier $C$ in the pre-train stage. We name feature encoder in this stage $M_s$. Legends of "source accuracy(test)" and "source accuracy(train)" represent $Ac(M_s(X^{te}_s))$ and $Ac(M_s(X^{tr}_s))$ respectively. The fourth figure shows training history of the adversarial adaptation stage. Recall that discriminator $D$ and feature encoder $M$ are trained in this stage, and we name feature encoder in this stage $M_t$.  Legends of "source accuracy(test)", "target accuracy(test)", "source accuracy(train)" and "target accuracy(train)" represent $Ac(M_t(X^{te}_s))$, $Ac(M_t(X^{te}_t))$, $Ac(M_t(X^{tr}_s))$ and $Ac(M_t(X^{tr}_t))$ respectively.
+
+Unlike ADDA, the power of $D$ doesn't improve so smoothly. We think it is because we are not minimizing $L_C$ and $L_D$ respectively but minimizing $L_{da} = L_C+L_D$. We want to keep a good performance of classifier $C$ the same time when trying to adjust $M$ to adapt the target domain data.
+
+\begin{figure*}[htb]
+\centering
+\begin{minipage}[t]{0.2\textwidth}
+\includegraphics[width=1.5in, height=1.5in]{Ldann/std_A2R/before.png}
+\end{minipage}%
+\begin{minipage}[t]{0.2\textwidth}
+\includegraphics[width=1.5in, height=1.5in]{Ldann/std_A2R/after.png}
+\end{minipage}%
+\begin{minipage}[t]{0.45\textwidth}
+\includegraphics[width=3.5in, height=1.5in]{Ldann/std_A2R/dann.png}
+\end{minipage}%
+\caption{Visualization of DANN ExA Result}\label{fig:ExA2}
+\end{figure*}
+
+\begin{figure*}[htb]
+\centering
+\begin{minipage}[t]{0.2\textwidth}
+\includegraphics[width=1.5in, height=1.5in]{Ldann/std_C2R/before.png}
+\end{minipage}%
+\begin{minipage}[t]{0.2\textwidth}
+\includegraphics[width=1.5in, height=1.5in]{Ldann/std_C2R/after.png}
+\end{minipage}%
+\begin{minipage}[t]{0.45\textwidth}
+\includegraphics[width=3.5in, height=1.5in]{Ldann/std_C2R/dann.png}
+\end{minipage}%
+\caption{Visualization of DANN ExC Result}\label{fig:ExC2}
+\end{figure*}
+
+\begin{figure*}[htb]
+\centering
+\begin{minipage}[t]{0.2\textwidth}
+\includegraphics[width=1.5in, height=1.5in]{Ldann/std_P2R/before.png}
+\end{minipage}%
+\begin{minipage}[t]{0.2\textwidth}
+\includegraphics[width=1.5in, height=1.5in]{Ldann/std_P2R/after.png}
+\end{minipage}%
+\begin{minipage}[t]{0.45\textwidth}
+\includegraphics[width=3.5in, height=1.5in]{Ldann/std_P2R/dann.png}
+\end{minipage}%
+\caption{Visualization of DANN ExP Result}\label{fig:ExP2}
+\end{figure*}
 
 \section{Discussions}
 \subsection{Problems of Network Design}
 No matter which deep model we applied, severe overfitting occurs when training the classifier. Take ADDA for example, $Ac(M_s(X^{tr}_s))$ are always greater than $Ac(M_s(X^{te}_s))$ by about 0.15. We tried dropping out some neurons and increases L2 regularization constraint, but these measures do not ease overfitting but brings negative effects on $Ac(M_s(X^{te}_s))$.
 
 Besides, specifically for ADDA, we found the discriminator can really grow too powerful to distinguish $X_s$ and $X_t$. We can design a more complicated and powerful $M$ to deceive the discriminator, of course. But a more complicated $M$ can also bring difficulties for the classification work.
+
+And, it should be noticed that the visualization doesn't show an obvious effect after domain adaptation and the performance gain using domain adaptation is also poor, $0.004 \leq g \leq 0.013$. We think there can still be room for improvement.
 
 
 \section{Conclusion}
@@ -300,7 +391,7 @@ sentence punctuation follows the bracket \cite{b2}.
 
 \begin{thebibliography}{00}
 \bibitem{ADDA1} Eric Tzeng, Judy Hoffman, Kate Saenko and Trevor Darrel, ``Adversarial Discriminative Domain Adaptation''.
-\bibitem{DANN1} Yaroslav Ganin, Evgeniya Ustinova, Hana Ajakan, Pascal Germain, Hugo Larochelle, Francois Laviolette, 
+\bibitem{DANN1} Yaroslav Ganin, Evgeniya Ustinova, Hana Ajakan, Pascal Germain, Hugo Larochelle, Francois Laviolette,
     Mario Marchand, Victor Lempitsky, ``Domain-Adversarial Training of Neural Networks''.
 \end{thebibliography}
 \vspace{12pt}
