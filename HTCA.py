@@ -33,7 +33,7 @@ def kernel(ker, X1, X2, gamma):
 
 
 class TCA:
-    def __init__(self, kernel_type='primal', dim=30, lamb=1, gamma=1):
+    def __init__(self, kernel_type='linear', dim=30, lamb=1, gamma=1):
         '''
         Init func
         :param kernel_type: kernel, values: 'primal' | 'linear' | 'rbf'
@@ -104,25 +104,27 @@ class TCA:
 
 
 if __name__ == '__main__':
-    [src,dst] = data_helper.read_paired_labeled_features(global_defs.DA.P2R)
-    Xs = src[0]
-    Ys = src[1]
-    Xt = dst[0]
-    Yt = dst[1]
-    print(Xs.shape)
-    print(Ys.shape)
-    D = [32, 64, 128, 256, 512, 1024, 2048]
-    for dd in D:
-        tca = TCA(dim=dd)
-        acc2, ypre2, Xs_new, Xt_new = tca.fit_predict_svm(Xs, Ys, Xt, Yt)
-        print(dd,"svm_rbf result:",acc2)
-        acc3, ypre3 = tca.fit_predict_lin_svm(Xs_new, Ys, Xt_new, Yt)
-        print(dd,"svm_lin result:",acc3)
-    '''
-    acc1, ypre1 = tca.fit_predict_KNN(Xs, Ys, Xt, Yt)
-    print("1NN result:",acc1)
-    '''
-    '''
-    acc3, ypre3 = tca.fit_predict_lin_svm(Xs, Ys, Xt, Yt)
-    print("svm_lin result:",acc3)
-    '''
+    for i in range(0,3):
+        [src,dst] = data_helper.read_paired_labeled_features(i)
+        Xs = src[0]
+        Ys = src[1]
+        Xt = dst[0]
+        Yt = dst[1]
+        print(Xs.shape)
+        print(Ys.shape)
+        #D = [32, 64, 128, 256, 512, 1024, 2048]
+        D = [2048]
+        for dd in D:
+            tca = TCA(dim=dd)
+            acc2, ypre2, Xs_new, Xt_new = tca.fit_predict_svm(Xs, Ys, Xt, Yt)
+            print(dd,"svm_rbf result:",acc2)
+            acc3, ypre3 = tca.fit_predict_lin_svm(Xs_new, Ys, Xt_new, Yt)
+            print(dd,"svm_lin result:",acc3)
+        '''
+        acc1, ypre1 = tca.fit_predict_KNN(Xs, Ys, Xt, Yt)
+        print("1NN result:",acc1)
+        '''
+        '''
+        acc3, ypre3 = tca.fit_predict_lin_svm(Xs, Ys, Xt, Yt)
+        print("svm_lin result:",acc3)
+        '''

@@ -21,11 +21,9 @@ PATH_RESNET50_FOLDER = '../Office-Home_resnet50'
 
 PATH_SAVING = mk_dir('Lsaving')
 PATH_MNIST = os.path.join(PATH_SAVING, 'MNIST_data')
-PATH_USPS1 = os.path.join(PATH_SAVING, 'usps/USPStrainingdata.mat')
-PATH_USPS2 = os.path.join(PATH_SAVING, 'usps/USPStestingdata.mat')
 PATH_RAW_DL_FEATURES = mk_dir(os.path.join(PATH_SAVING, 'raw_dls'))
 PATH_ADDA_SAVING = mk_dir(os.path.join(PATH_SAVING, 'adda'))
-PATH_DANN_SAVING = mk_dir(os.path.join(PATH_SAVING, 'dann'))
+
 
 class DA(IntEnum):
     A2R = 0

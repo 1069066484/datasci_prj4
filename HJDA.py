@@ -99,7 +99,7 @@ class JDA:
             Y_tar_pseudo = clf.predict(Xt_new)
             '''
             
-            clf = svm.SVC(C=1.0, kernel='rbf',gamma = 'scale', decision_function_shape='ovr')
+            clf = svm.SVC(C=5.0, kernel='rbf',gamma = 'scale', decision_function_shape='ovr')
             clf.fit(Xs_new, Ys.ravel())
             Y_tar_pseudo = clf.predict(Xt_new)
             
@@ -115,16 +115,20 @@ class JDA:
 
 
 if __name__ == '__main__':
-    for i in range(1,3):
+    f = open("result.txt", 'w')
+    for i in range(0,3):
         [src,dst] = data_helper.read_paired_labeled_features(i)
         Xs = src[0]
         Ys = src[1]
         Xt = dst[0]
         Yt = dst[1]
-        D = [32, 64, 128, 256, 512, 1024, 2048]
+        #D = [32, 64, 128, 256, 512, 1024, 2048]
+        D = [1024, 2048]
         for dd in D:
             jda = JDA(kernel_type='primal', dim=dd, lamb=1, gamma=1)
             acc, ypre, list_acc = jda.fit_predict(Xs, Ys, Xt, Yt)
             print(dd,":",acc)
+            f.write(str(acc)+'\t')
+        f.write('\n')
 
     

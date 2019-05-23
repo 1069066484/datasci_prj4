@@ -3,9 +3,6 @@
 Created on Mon May 13 22:29:48 2019
 
 @author: 12709
-
--- Zhixin Ling modified. 2019/5/17. 
-    Adding example codes to evaluate training and test accuracies and domain adaptation improvement.
 """
 
 import numpy as np
@@ -14,6 +11,27 @@ from cvxopt import matrix, solvers
 import Ldata_helper as data_helper
 import Lglobal_defs as global_defs
 from sklearn import svm
+
+def main_example():
+    [src_dl, tgt_dl] = data_helper.read_paired_labeled_features(global_defs.DA.P2R)
+    src_dl = data_helper.shuffle_labeled_data(src_dl)
+
+    # First, test your model without domain adaptation
+    clf = svm.LinearSVC()
+    clf.fit(src_dl[0], src_dl[1].ravel(), max_iter=100)
+    y_pred = clf.predict(tgt_dl[0])
+    acc_without_da = sklearn.metrics.accuracy_score(tgt_dl[1], y_pred)
+
+    # You need to split the target dataset into training set and test set
+    tgt_tr_dl, tgt_te_dl = data_helper.labeled_data_split(tgt_dl, 0.6)
+    kmm = KMM(kernel_type='rbf', B=10)
+    beta = kmm.fit(Xs, Xt)
+    acc_training_with_da, _, clf = kmm.fit_predict_svm(src_dl[0], src_dl[1], tgt_tr_dl[0], tgt_tr_dl[1], beta)
+    y_pred = clf.predict(tgt_te_dl[0])
+    acc_test_with_da = sklearn.metrics.accuracy_score(tgt_te_dl[1], y_pred)
+    print("Accuracy without domain adaptation = ", acc_without_da)
+    print("Training accuracy with domain adaptation = ", acc_training_with_da)
+    print("Test accuracy with domain adaptation = ", acc_test_with_da)
 
 def kernel(ker, X1, X2, gamma):
     K = None
@@ -80,52 +98,18 @@ class KMM:
         acc = sklearn.metrics.accuracy_score(Yt, y_pred)
         return acc, y_pred
 
-    def fit_predict_svm2(self, Xs, Ys, Xt, Yt, beta):
-        weight = beta
-        clf = svm.SVC(C=1.0, kernel='rbf',gamma = 'scale', decision_function_shape='ovr',  max_iter=100)
-        clf.fit(Xs, Ys.ravel(), weight.ravel())
-        y_pred = clf.predict(Xt)
-        acc = sklearn.metrics.accuracy_score(Yt, y_pred)
-        return acc, y_pred, clf
-
-
-def main_example():
-    [src_dl, tgt_dl] = data_helper.read_paired_labeled_features(global_defs.DA.P2R)
-    src_dl = data_helper.shuffle_labeled_data(src_dl)
-
-    # First, test your model without domain adaptation
-    clf = svm.LinearSVC()
-    clf.fit(src_dl[0], src_dl[1].ravel(), max_iter=100)
-    y_pred = clf.predict(tgt_dl[0])
-    acc_without_da = sklearn.metrics.accuracy_score(tgt_dl[1], y_pred)
-
-    # You need to split the target dataset into training set and test set
-    tgt_tr_dl, tgt_te_dl = data_helper.labeled_data_split(tgt_dl, 0.6)
-    kmm = KMM(kernel_type='rbf', B=10)
-    beta = kmm.fit(Xs, Xt)
-    acc_training_with_da, _, clf = kmm.fit_predict_svm2(src_dl[0], src_dl[1], tgt_tr_dl[0], tgt_tr_dl[1], beta)
-    y_pred = clf.predict(tgt_te_dl[0])
-    acc_test_with_da = sklearn.metrics.accuracy_score(tgt_te_dl[1], y_pred)
-    print("Accuracy without domain adaptation = ", acc_without_da)
-    print("Training accuracy with domain adaptation = ", acc_training_with_da)
-    print("Test accuracy with domain adaptation = ", acc_test_with_da)
-
-
-def main():
-    [src,dst] = data_helper.read_paired_labeled_features(global_defs.DA.P2R)
-    Xs = src[0]
-    Ys = src[1]
-    Xt = dst[0]
-    Yt = dst[1]
-    kmm = KMM(kernel_type='rbf', B=10)
-    beta = kmm.fit(Xs, Xt)
-    print(beta)
-    print(beta.shape)
-    acc2, ypre2 = kmm.fit_predict_svm(Xs, Ys, Xt, Yt, beta)
-    print("svm_rbf result:",acc2)
-    acc3, ypre3 = kmm.fit_predict_lin_svm(Xs, Ys, Xt, Yt, beta)
-    print("svm_lin result:",acc3)
-
-
 if __name__ == '__main__':
-    main()
+    for i in range(0,3):
+        [src,dst] = data_helper.read_paired_labeled_features(i)
+        Xs = src[0]
+        Ys = src[1]
+        Xt = dst[0]
+        Yt = dst[1]
+        kmm = KMM(kernel_type='linear', B=10)
+        beta = kmm.fit(Xs, Xt)
+        print(beta)
+        print(beta.shape)
+        acc2, ypre2 = kmm.fit_predict_svm(Xs, Ys, Xt, Yt, beta)
+        print("svm_rbf result:",acc2)
+        acc3, ypre3 = kmm.fit_predict_lin_svm(Xs, Ys, Xt, Yt, beta)
+        print("svm_lin result:",acc3)

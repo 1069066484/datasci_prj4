@@ -50,7 +50,7 @@ class CORAL:
     def fit_predict_svm(self, Xs, Ys, Xt, Yt):
         Xs_new = self.fit(Xs, Xt)
         print(Xs_new.shape)
-        clf = svm.SVC(C=1.0, kernel='rbf',gamma = 'scale', decision_function_shape='ovr')
+        clf = svm.SVC(C=5.0, kernel='rbf',gamma = 'scale', decision_function_shape='ovr')
         clf.fit(Xs_new, Ys.ravel())#.ravel())
         y_pred = clf.predict(Xt)
         acc = sklearn.metrics.accuracy_score(Yt, y_pred)
@@ -65,19 +65,22 @@ class CORAL:
 
 
 if __name__ == '__main__':
-    [src,dst] = data_helper.read_paired_labeled_features(global_defs.DA.P2R)
-    Xs = src[0]
-    Ys = src[1]
-    Xt = dst[0]
-    Yt = dst[1]
-    print(Xs.shape)
-    print(Ys.shape)
-    coral = CORAL()
-    
-    acc1, ypre1 = coral.fit_predict_KNN(Xs, Ys, Xt, Yt)
-    print("1NN result:",acc1)
-    acc2, ypre2 = coral.fit_predict_svm(Xs, Ys, Xt, Yt)
-    print("svm_rbf result:",acc2)
-    acc3, ypre3 = coral.fit_predict_lin_svm(Xs, Ys, Xt, Yt)
-    print("svm_lin result:",acc3)
-    
+    for i in range(0,3):
+        [src,dst] = data_helper.read_paired_labeled_features(i)
+        Xs = src[0]
+        Ys = src[1]
+        Xt = dst[0]
+        Yt = dst[1]
+        print(Xs.shape)
+        print(Ys.shape)
+        coral = CORAL()
+        '''
+        acc1, ypre1 = coral.fit_predict_KNN(Xs, Ys, Xt, Yt)
+        print("1NN result:",acc1)
+        '''
+        acc2, ypre2 = coral.fit_predict_svm(Xs, Ys, Xt, Yt)
+        print("svm_rbf result:",acc2)
+        '''
+        acc3, ypre3 = coral.fit_predict_lin_svm(Xs, Ys, Xt, Yt)
+        print("svm_lin result:",acc3)
+        '''
