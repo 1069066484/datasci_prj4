@@ -216,12 +216,26 @@ def _get_dicts_test():
 
 
 def _test_read_paired_labeled_features():
-    [src_dl, dst_dl] = read_paired_labeled_features(global_defs.DA.A2R)
-    print(src_dl[0].shape)
-    print(src_dl[1].shape)
-    print(dst_dl[0].shape)
-    print(dst_dl[1].shape)
-
+    for f in [global_defs.DA.A2R, global_defs.DA.P2R, global_defs.DA.C2R]:
+        [src_dl, dst_dl] = read_paired_labeled_features(f)
+        print(src_dl[0].shape)
+        print(src_dl[1].shape)
+        print(dst_dl[0].shape)
+        print(dst_dl[1].shape)
+        '''
+        (2427, 2048)
+        (2427,)
+        (4357, 2048)
+        (4357,)
+        (4439, 2048)
+        (4439,)
+        (4357, 2048)
+        (4357,)
+        (4365, 2048)
+        (4365,)
+        (4357, 2048)
+        (4357,)
+        '''
 
 def _test_labels_one_hot():
     a = np.array([2,1,0,0,0,2,1,1,1])
@@ -229,4 +243,4 @@ def _test_labels_one_hot():
 
 
 if __name__ == '__main__':
-    _test_visualize_da()
+    _test_read_paired_labeled_features()

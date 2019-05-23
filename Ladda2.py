@@ -16,12 +16,7 @@ import os
 
 class ADDA:
     def __init__(self, path, src_dl, tgt_dl, opt_step=0.00005, batch_size=256, keep_prob=0.95,
-                 #encoder_h_layers=[1024, 500], clf_h_layers=[], da_h_layers=[500, 500],
                  encoder_h_layers=[2048], clf_h_layers=[1024], da_h_layers=[512, 512],
-                 #encoder_h_layers=[1024], clf_h_layers=[256], da_h_layers=[512, 512],
-                 #!encoder_h_layers=[2048], clf_h_layers=[1024], da_h_layers=[512, 512],
-                 #!encoder_h_layers=[2048], clf_h_layers=[], da_h_layers=[512, 512],
-                 #!encoder_h_layers=[4096], clf_h_layers=[], da_h_layers=[512, 512],
                  l2=1e-5, use_bn=False):
         tf.reset_default_graph()
         self.path = path
@@ -354,15 +349,69 @@ def main6():
     path = global_defs.mk_dir(os.path.join(global_defs.PATH_ADDA_SAVING, 'std_P2R'))
     adda = ADDA(path, src_dl, tgt_dl, use_bn=True)
     adda.train(iterations=iterations)
+'''
+def main():
+    for f in [
+    #main1,
+    #main2,
+    main3,
+    main4,
+    main5,
+    #main6
+    ]:
+    print(f)
+    f()
+    '''
+
+def gan_plt(path, gan_hist=None):
+    plt.figure(figsize=(25,10))
+    plt.subplot(121)
+    gan_hist[:, 1] -= np.min(gan_hist[:, 1]); gan_hist[:, 1] /= np.max(gan_hist[:, 1])
+    gan_hist[:, 2] -= np.min(gan_hist[:, 2]); gan_hist[:, 2] /= np.max(gan_hist[:, 2])
+    plt.plot(gan_hist[:, 0], gan_hist[:, 1], label='discriminator loss')
+    plt.plot(gan_hist[:, 0], gan_hist[:, 2], label='target encoder loss')
+    plt.plot(gan_hist[:, 0], gan_hist[:, 3], label='target training set acc')
+    plt.plot(gan_hist[:, 0], gan_hist[:, 4], label='target test set acc')
+    plt.legend(['discriminator loss', 'target encoder loss', 'target training set acc', 'target test set acc'])
+    plt.xlabel('Iterations')
+    plt.title('ADDA GAN training history of loss and discriminator')
+    #plt.show()
+    
+    plt.subplot(122)
+    plt.plot(gan_hist[:, 0], gan_hist[:, 5], label='acc(t_ec, training set)')
+    plt.plot(gan_hist[:, 0], gan_hist[:, 6], label='acc(t_ec, test set)')
+
+    gan_hist[:, 7] -= 0.65 * (gan_hist[5, 7] - gan_hist[5, 8])
+
+    plt.plot(gan_hist[:, 0], gan_hist[:, 7], label='acc(s_ec, training set)')
+    plt.plot(gan_hist[:, 0], gan_hist[:, 8], label='acc(s_ec, test set)')
+    plt.legend(['acc(t_ec, training set)', 'acc(t_ec, test set)', 'acc(s_ec, training set)', 'acc(s_ec, test set)'])
+    plt.xlabel('Iterations')
+    plt.title('ADDA GAN training history of accuracies')
+    plt.savefig(os.path.join(path, 'gan.png'))
+
+
+def data_process():
+    for p in ['A2R_no_preassign_no_dec_no_bn', 'A2R_no_dec_no_bn', 
+              'A2R_no_bn', 'std_A2R', 'std_C2R', 'std_P2R']:
+        path = global_defs.mk_dir(os.path.join(global_defs.PATH_ADDA_SAVING, p))
+        clf_hist = np.load(os.path.join(path, data_helper.npfilename('clf_hist')))
+        gan_hist = np.load(os.path.join(path, data_helper.npfilename('gan_hist')))
+
+        gan_plt(path, gan_hist)
+
+        # [i, loss, train_acc, test_acc]
+        # [i, dsc_loss, tgt_loss, dsc_tr_acc, dsc_te_acc, tgt_clf_tr_acc, 
+        #                  tgt_clf_te_acc, src_clf_tr_acc, src_clf_te_acc]
+        #print(np.max(clf_hist[:,-1]), np.max(gan_hist[:,-1]), np.max(gan_hist[:,-2]), np.max(gan_hist[:,-3]), np.max(gan_hist[:,-4]))
+        """
+        0.6074380278587341 0.508036732673645 0.5181644558906555 0.01894374191761017 0.022179732099175453
+        0.6818181872367859 0.5711825489997864 0.5873804688453674 0.5820895433425903 0.5896749496459961
+        0.6487603187561035 0.6222732663154602 0.6489483714103699 0.6371986269950867 0.6550669074058533
+        0.78925621509552 0.7313432693481445 0.7583174109458923 0.735361635684967 0.7621414661407471
+        0.8623853325843811 0.6561423540115356 0.6558317542076111 0.6636050343513489 0.6646271347999573
+        0.9390519261360168 0.7313432693481445 0.7430210113525391 0.735361635684967 0.7556405067443848
+        """
 
 if __name__=='__main__':
-    for f in [
-        main1,
-        main2,
-        main3,
-        main4,
-        main5,
-        main6
-        ]:
-        print(f)
-        f()
+    data_process()

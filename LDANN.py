@@ -4,11 +4,6 @@
 @Description: Part of the project of Data Science: Implementation of dann network.
             Great thanks to pumppikano's work(https://github.com/pumpikano/tf-dann/).
 """
-
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import tensorflow as tf
 import numpy as np
 import pickle as pkl
@@ -257,12 +252,12 @@ class DANN:
 def plt_hist(src_hist, da_hist, path):
     plt.figure(figsize=(25,10))
     plt.subplot(122)
-    da_hist[:, 4] -= np.min(da_hist[:, 4]); da_hist[:, 4] /= np.max(da_hist[:, 4])
-    da_hist[:, 5] -= np.min(da_hist[:, 5]); da_hist[:, 5] /= np.max(da_hist[:, 5])
-    da_hist[:, 6] -= np.min(da_hist[:, 6]); da_hist[:, 6] /= np.max(da_hist[:, 6])
-    plt.plot(da_hist[:, 0], da_hist[:, 4], label='DANN total loss')
-    plt.plot(da_hist[:, 0], da_hist[:, 5], label='Discriminator loss')
-    plt.plot(da_hist[:, 0], da_hist[:, 6], label='classifier loss')
+    da_hist[:, 4] -= np.min(da_hist[:, 4]); da_hist[:, 4] /= np.max(da_hist[:, 4]) * 2;
+    da_hist[:, 5] -= np.min(da_hist[:, 5]); da_hist[:, 5] /= np.max(da_hist[:, 5]) * 2;
+    da_hist[:, 6] -= np.min(da_hist[:, 6]); da_hist[:, 6] /= np.max(da_hist[:, 6]) * 2;
+    plt.plot(da_hist[:, 0], da_hist[:, 4] + 0.5, label='DANN total loss(scaled)')
+    plt.plot(da_hist[:, 0], da_hist[:, 5] + 0.5, label='Discriminator loss(scaled)')
+    plt.plot(da_hist[:, 0], da_hist[:, 6] + 0.5, label='classifier loss(scaled)')
     plt.plot(da_hist[:, 0], da_hist[:, 7], label='discriminator accuracy')
 
     plt.plot(da_hist[:, 0], da_hist[:, 1], label='source accuracy(test)')
@@ -270,7 +265,7 @@ def plt_hist(src_hist, da_hist, path):
     plt.plot(da_hist[:, 0], da_hist[:, -2], label='source accuracy(train)')
     plt.plot(da_hist[:, 0], da_hist[:, -1], label='target accuracy(train)')
 
-    plt.legend(['DANN total loss', 'Discriminator loss', 'classifier loss', 'discriminator accuracy(training)', 
+    plt.legend(['DANN total loss(scaled)', 'Discriminator loss(scaled)', 'classifier loss(scaled)', 'discriminator accuracy(training)', 
                 'source accuracy(test)', 'target accuracy(test)', 'source accuracy(train)', 'target accuracy(train)'])
     plt.xlabel('Iterations')
     plt.title('DANN training history of da stage')
@@ -339,6 +334,29 @@ def main():
                                   os.path.join(top_dir, 'after.png'))
 
 
+def data_process():
+    #hist.append([i, source_te_acc, target_te_acc, test_domain_acc, batch_loss, dloss, ploss, d_acc, p_acc,source_tr_acc,target_tr_acc])
+    for name in ['std_A2R', 'std_C2R', 'std_P2R']:
+        top_dir = global_defs.mk_dir(os.path.join(global_defs.PATH_DANN_SAVING, name))
+        src_hist_filename = data_helper.npfilename(os.path.join(top_dir, 'src_hist'))
+        da_hist_filename = data_helper.npfilename(os.path.join(top_dir, 'da_hist'))
+        src_hist = np.load(src_hist_filename)
+        da_hist = np.load(da_hist_filename)
+        #plt_hist(src_hist, da_hist, top_dir)
+
+        print(np.max(src_hist[:,1]), np.max(src_hist[:,2]), 
+              np.max(da_hist[:,-1]), np.max(da_hist[:,2]))
+        """
+        0.801980197429657 0.7171717286109924 0.7487760186195374 0.7309458255767822
+        0.8670943975448608 0.650137722492218 0.6682986617088318 0.6547291278839111
+        0.9576194882392883 0.7327823638916016 0.7411260604858398 0.739210307598114
+        """
+        #idx_max_tgt_te_acc_bf = np.argmax(src_hist[:,2])
+        #idx_max_tgt_te_acc_af = np.argmax(da_hist[:,2])
+        #print(src_hist[idx_max_tgt_te_acc_bf])
+        #print(da_hist[idx_max_tgt_te_acc_af])
+
 
 if __name__=='__main__':
-    main()
+    #main()
+    data_process()
