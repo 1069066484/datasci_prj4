@@ -52,7 +52,37 @@ Introduction of Project4.
 
 \section{Approaches}
 In this section, we present our methods applied for classification. And we will emphasize differences of our approaches compared with standard ones.
+\subsection{Traditional era}
+\subsubsection{TCA}
+Pan, Sinno Jialin, et al. proposed to find a representation through a learning method, transfer component analysis(TCA), for domain adaptation in \cite{TCA}. TCA tries to learn a set of common transfer components underlying both domains such that the difference in data distributions of the different domains, when projected onto this subspace, can be dramatically reduced and data properties can be preserved.
+\subsubsection{CORAL}
+Sun, Baochen, Jiashi Feng, and Kate Saenko proposed a simple, effective, and efficient method for unsupervised domain adaptation called CORrelation ALignment(CORAL) in \cite{CORAL}. CORAL minimizes domain shift by aligning the second-order statistics of source and target distributions, without requiring any target labels.
+\subsubsection{KMM}
+Huang, Jiayuan, et al. presented a nonparametric method which directly produces resampling weights without distribution estimation to deal with data adaptation in \cite{KMM}. Their method is called kernel mean matching(KMM), which works by matching distributions between training and testing sets in feature space.
+\subsubsection{JDA}
+Mingsheng Long, et al. put forward a novel transfer learning approach, referred to as Joint Distribution Adaptation(JDA) in \cite{JDA}. Specifically, JDA aims to jointly adapt both the marginal distribution and conditional distribution in a principled dimensionality reduction procedure, and construct new feature representation that is effective and robust for substantial distribution difference. 
+\subsection{DaNN}
+Muhammad Ghifary, et al. propose a simple neural network model to deal with the domain adaptation problem in \cite{DaNN}. This model incorporates the Maximum Mean Discrepancy(MMD) measure as a regularization in the supervised learning to reduce the distribution mismatch between the source and target domains in the latent space. This model is called Domain Adaptive Neural Network(DaNN), which in fact is a variant of the standard feed forward neural network.
 
+The way this model runs can be described as follows:
+\begin{enumerate}
+\item Calculate the loss function. Given the labeled source data $\left\{\mathbf{X}_{s}^{(i)}, \mathbf{y}_{s}^{(i)}\right\}_{i=1, \ldots, n_{s}}$ and the unlabeled target data $\left\{\mathbf{x}_{t}^{(j)}\right\}_{j}=1, \ldots, n_{t}$, the loss function of a single layer DaNN is given by
+\begin{equation}
+J_{\mathrm{DaNN}}=J_{\mathrm{NNs}}+\gamma \mathcal{M M D}_{e}^{2}\left(\mathrm{q}_{s}, \overline{\mathrm{q}}_{t}\right)
+\end{equation}
+where $J_{\mathrm{NNS}}=-\frac{1}{n_{s}} \sum_{i=1}^{n_{s}} \sum_{k=1}^{l}\left(\left[\mathbf{y}_{s}^{(i)}\right]_{k} \log \left(\left[f\left(\mathbf{x}_{s}^{(i)}\right)\right]_{k}\right)\right)$, $\mathbf{q}_{s}=\mathbf{W}_{1}^{\top} \mathbf{x}_{s}+\mathbf{b}$, $\overline{\mathrm{q}}_{t}= \mathbf{W}_{1}^{\top} \mathbf{x}_{t}+\mathbf{b}$ are the linear combination outputs before the activation,and $\gamma$ is the regularization constant controlling the importance of MMD contribution to the loss function.\\
+\item Minimize the loss function. We choose the Gaussian kernel as the kernel function of the form $k_{G}(\mathrm{x}, \mathrm{y})=\exp \left(-\frac{\|\mathrm{x}-\mathrm{y}\|^{2}}{2 s^{2}}\right)$, where $s$ is the standard deviation and rewrite $\mathcal{M} \mathcal{M} \mathcal{D}_{e}^{2}(\cdot, \cdot)$ as:
+\begin{tiny}
+\begin{eqnarray}
+\mathcal{M M D}_{e}^{2}\left(\mathbf{U}_{1}^{\top} \mathbf{X}_{s}, \mathbf{U}_{1}^{\top} \mathbf{X}_{t}\right)=\frac{1}{n_{s}^{2}} \sum_{i, j=1}^{n_{s}} \exp \left(-\frac{\left(\mathbf{x}_{s}^{(i)}-\mathbf{x}_{s}^{(j)}\right)^{\top} \mathbf{U}_{1} \mathbf{U}_{1}^{\top}\left(\mathbf{x}_{s}^{(i)}-\mathbf{x}_{s}^{(i)}\right)}{2 s^{2}}\right)\\
++\frac{1}{n_{t}^{2}} \sum_{i, j=1}^{n_{t}} \exp \left(-\frac{\left(\mathrm{x}_{t}^{(i)}-\mathrm{x}_{t}^{(j)}\right)^{\top} \mathrm{U}_{1} \mathbf{U}_{1}^{\top}\left(\mathrm{x}_{t}^{(i)}-\mathrm{x}_{t}^{(i)}\right)}{2 s^{2}}\right)\\
+-\frac{2}{n_{s} n_{t}} \sum_{i, j=1}^{n_{s}, n_{t}} \exp \left(-\frac{\left(\mathbf{x}_{s}^{(i)}-\mathbf{x}_{t}^{(j)}\right)^{\top} \mathbf{U}_{1} \mathbf{U}_{1}^{\top}\left(\mathbf{x}_{s}^{(i)}-\mathbf{x}_{t}^{(i)}\right)}{2 s^{2}}\right)
+\end{eqnarray}
+\end{tiny}
+In the implementation, we separate the minimization of $J_{\mathrm{NNs}}$ and $\mathcal{M} \mathcal{M} \mathcal{D}_{e}^{2}(\cdot, \cdot)$ into two step. Firstly, $J_{\mathrm{NNs}}$ is minimized using a $mini-batched$ stochastic gradient descent with respect to $\mathbf{U}_{1}$ update. Then, $\mathcal{M} \mathcal{M} \mathcal{D}_{e}^{2}(\cdot, \cdot)$ is minimized by re-updating $\mathbf{U}_{1}$. The latter step is accomplished by a full-batched
+gradient descent.
+\end{enumerate}
+DaNN is rather a simple neural network(with only 1 hidden layer) for domain adaptation. But its idea is important that brings MMD(maximum mean discrpancy) for adaptation in neural network.
 \subsection{ADDA}
 Eric Tzeng, et al. summarized a generalized architecture for adversarial domain adaptation and introduced a method of domain adaptation, Adversarial Discriminative Domain Adaptation, in his work \cite{ADDA1}. Using their summarization, ADDA is a combination of generative and discriminative neural network model that uses untied weight sharing between source mapping and target mapping and a GAN loss.
 
@@ -131,6 +161,301 @@ The general architecture is presented in figure \ref{DANN_overview}; it's simple
 Also, we combined stage of adversarial adaptation and testing together as adversarial adaptation. Compared to ADDA method that tries to bring $M_t(X_t)$ to $M_s(X_s)$ as closer as possible, DANN method is just like trying to adjust a well-trained source domain encoder $M_s$ to work on target domain data, $X_t$.
 
 \section{Experiments And Results}
+\subsection{Traditional era}
+In this section we will show the experiments that we have done by using traditional domain adaptation methods.
+First of all, in Table~\ref{tab:RAW}, we will show the test accuracy of some classification methods on target domain if we do not any apply domain adaptation method. In this part, we train the classifiers on source domain and test them on target domain. 1NN means k-NN method with $k=1$. In this section, we use $X_s$, $X_t$, $X_t\_new$, $X_s\_new$ respectively to denote the features of source domain, the features of target domain, the features of source domain which has been reconstructed by domain adaptation method and the features of target domain which has been reconstructed by domain adaptation method. We use $A2R$ to show the source domain is Art and the target domain is RealWorld. $C2R$ and $P2R$ are similar to $A2R$. And $SVM\_lin$ means SVM with linear kernel while $SVM\_RBF$ means SVM with RBF kernel.
+
+ \begin{table}[h]
+ \begin{scriptsize}
+	\centering
+	\caption{testing accuracy without domain adaptation method}
+	\label{tab:RAW}
+	\begin{tabular}{cccccc}
+		\hline
+		Src &Tar&1NN&SVM(linear)&SVM(RBF,C=1)&SVM(RBF,C=5) \\
+		\hline
+		\hline
+        $Art$ & $Real$ & 0.6580 & 0.7310 & 0.7436 & 0.7473 \\
+		$Clipart$ & $Real$ & 0.5864& 0.6013 & 0.6488 & 0.6511\\
+		$Product$ & $Real$ & 0.6957& 0.6879 & 0.7266 & 0.7296  \\
+		\hline
+	\end{tabular}
+\end{scriptsize}
+\end{table}
+
+\subsubsection{TCA Experiments}
+In this section we have done three parts of experiments. The experiments of the first two parts have been shown in Table~\ref{tab:TCA1}, Table~\ref{tab:TCA2} and Table~\ref{tab:TCA3}
+\begin{table}[h]
+\begin{tiny}
+\centering
+	\caption{A2R: part1 and part2 }
+	\begin{tabular}{c|c|c|c|c|c|c|c}
+	\label{tab:TCA1}\\
+	\hline
+	\diagbox{classifier}{testing accuracy}{dim} & 32 & 64 & 128 & 256 & 512 &1024 &2048 \\
+	\hline
+	$SVM\_lin$ &0.7067&0.7434&0.7540&0.7563&0.7572&0.7567&0.7567\\
+	\hline
+	$SVM\_RBF(C=1)$ &0.7122 &0.7418&0.7519&0.7466&0.7464&0.7448&0.7434\\
+	\hline
+	$SVM\_RBF(C=5)$ &0.7207&0.7519&0.7590&0.7599&0.7604&0.7602&0.7602\\
+	\hline
+	\end{tabular} 
+\end{tiny}
+\end{table}
+
+\begin{table}[h]
+\begin{tiny}
+\centering
+	\caption{C2R: part1 and part2 }
+	\begin{tabular}{c|c|c|c|c|c|c|c}
+	\label{tab:TCA2}\\
+	\hline
+	\diagbox{classifier}{testing accuracy}{dim} & 32 & 64 & 128 & 256 & 512 &1024 &2048 \\
+	\hline
+	$SVM\_lin$ &0.6282&0.6523&0.6612&0.6677&0.6688&0.6695&0.6693\\
+	\hline
+	$SVM\_RBF(C=1)$ &0.6440&0.6553&0.6550&0.6543&0.6530&0.6527&0.6530\\
+	\hline
+	$SVM\_RBF(C=5)$ &0.6369&0.6534&0.6587&0.6562&0.6557&0.6562&0.6553\\
+	\hline
+	\end{tabular} 
+\end{tiny}
+\end{table}
+
+\begin{table}[h]
+\begin{tiny}
+\centering
+	\caption{P2R: part1 and part2 }
+	\begin{tabular}{c|c|c|c|c|c|c|c}
+	\label{tab:TCA3}\\
+	\hline
+	\diagbox{classifier}{testing accuracy}{dim} & 32 & 64 & 128 & 256 & 512 &1024 &2048 \\
+	\hline
+	$SVM\_lin$ &0.7101&0.7287&0.7354&0.7377&0.7404&0.7406&0.7402\\
+	\hline
+	$SVM\_RBF(C=1)$ &0.7248&0.7429&0.7372&0.7393&0.7395&0.7395&0.7393\\
+	\hline
+	$SVM\_RBF(C=5)$ &0.7131&0.7310&0.7296&0.7305&0.7305&0.7310&0.7308\\
+	\hline
+	\end{tabular} 
+\end{tiny}
+\end{table}
+
+In these two parts we have set the kernel method TCA uses to be 'primal' which means TCA does not apply kernel method.
+
+The first part is about different dimensions of features of source domain and target domain after TCA process. From the three tables above, we can find a interesting phenomenon that with the number of dimensions growing, all the testing accuracy of different classifier and different combination of source domain and target domain initially goes higher but stays stable when dimensions have reach 512. We guess the reason is that with the reconstruction of TCA, when $X_s\_new$' dimensions reach 512, $X_s\_new$ and $X_t\_new$ contains enough information. The Maximum Mean Discrepancy becomes small between source domain and target domain and different domains are close to each other and testing accuracy reach a high point.
+
+The second part is about different classifiers. We can find for all $A2R$, $C2R$ and $P2R$, when the number of dimensions is small, $SVM\_RBF$ performs better than $SVM\_lin$ while the case is the contrary when dimensions is bigger. This is because $SVM\_lin$ is suitable for the situation that number of features and number of samples are close and $SVM\_RBF$ is suitable for the situation that the number of features is small. And for the hyper-parameter $C$ in $SVM\_RBF$, we find a bigger $C$ can performs better on $A2R$ and $C2R$ but a small $C$ is better on $P2R$.
+
+Then we show the result of the third part in Table~\ref{tab:TCA4}, Table~\ref{tab:TCA5} and Table~\ref{tab:TCA6}.
+\begin{table}[h]
+\begin{scriptsize}
+\centering
+	\caption{A2R: part3}
+	\begin{tabular}{c|c|c|c}
+	\label{tab:TCA4}\\
+	\hline
+	\diagbox{classifier}{testing accuracy}{TCA kernel type} & primal & linear & RBF \\
+	\hline
+	$SVM\_lin$ &0.7567&0.4983&0.5554\\
+	\hline
+	$SVM\_RBF$ &0.7434&0.1958&0.0.2454\\
+	\hline
+	\end{tabular} 
+\end{scriptsize}
+\end{table}
+
+\begin{table}[h]
+\begin{scriptsize}
+\centering
+	\caption{C2R: part3}
+	\begin{tabular}{c|c|c|c}
+	\label{tab:TCA5}\\
+	\hline
+	\diagbox{classifier}{testing accuracy}{TCA kernel type} & primal & linear & RBF \\
+	\hline
+	$SVM\_lin$ &0.6693&0.5625&0.5965\\
+	\hline
+	$SVM\_RBF$ &0.6530&0.3002&0.3514\\
+	\hline
+	\end{tabular} 
+\end{scriptsize}
+\end{table}
+
+\begin{table}[h]
+\begin{scriptsize}
+\centering
+	\caption{P2R: part3}
+	\begin{tabular}{c|c|c|c}
+	\label{tab:TCA6}\\
+	\hline
+	\diagbox{classifier}{testing accuracy}{TCA kernel type} & primal & linear & RBF \\
+	\hline
+	$SVM\_lin$ &0.7402&0.6635&0.6945\\
+	\hline
+	$SVM\_RBF$ &0.7393&0.5280&0.5843\\
+	\hline
+	\end{tabular} 
+\end{scriptsize}
+\end{table}
+For this part we have set dimensions to be 2048 and try to find the difference between different kernel method in TCA. From Table~\ref{tab:TCA4} we can find that we get rather bad results with TCA(RBF) and TCA(linear). Besides, in the experimental process, the run time of TCA(RBF) and TCA(linear) is very long.
+
+\subsubsection{CORAL Experiments}
+As Baochen Sun, et al. has pointed in \cite{CORAL}, CORAL is a "frustratingly easy" domain adaptation method which does not have many parameters. So in this section, we have compared the performances of CORAL on different source-target combinations and different classifier.
+\begin{table}[h]
+\begin{tiny}
+\centering
+	\caption{CORAL experiments}
+	\begin{tabular}{c|c|c|c|c}
+	\label{tab:CORAL}\\
+	\hline
+	\diagbox{Src\&Tar}{testing accuracy}{classifier} & $1NN$ & $SVM\_lin$ & $SVM\_RBF(C=1)$ & $SVM\_RBF(C=5)$ \\
+	\hline
+	$A2R$ &0.6488&0.7090&0.7390&0.7450\\
+	\hline
+	$C2R$ &0.5830&0.5997&0.6514&0.6504\\
+	\hline
+	$P2R$ &0.6851&0.6906&0.7310&0.7276\\
+	\hline
+	\end{tabular} 
+\end{tiny}
+\end{table}
+From Table~\ref{tab:CORAL} we can find $SVM\_RBF$ performs much better than $1NN$ and $SVM_lin$. The change of hyper-parameter $C$ does not have a big influence on the performance. And we can compare the performance of CORAL with results that have been shown in Table~\ref{tab:RAW}. The performance of CORAL is even worse than the situation without domain adaptation method. This may be the price of "frustrating easy".
+
+\subsubsection{KMM Experiments}
+In this section, we have change the kernel type that KMM uses to see the different performance of KMM. Of course we have tried different classifier and apply them on different source domain and target domain.
+\begin{table}[h]
+%\begin{tiny}
+\centering
+	\caption{KMM experiments on $A2R$}
+	\begin{tabular}{c|c|c}
+	\label{tab:KMM1}\\
+	\hline
+	\diagbox{classifier}{testing accuracy}{kernel type} & linear & RBF \\
+	\hline
+	$SVM\_lin$ &0.7296&0.7312\\
+	\hline
+	$SVM\_RBF(C=1)$ &0.6729 &0.7356\\
+	\hline
+	$SVM\_RBF(C=5)$ &0.6723&0.7471\\
+	\hline
+	\end{tabular} 
+%\end{tiny}
+\end{table}
+
+\begin{table}[h]
+%\begin{tiny}
+\centering
+	\caption{KMM experiments on $C2R$}
+	\begin{tabular}{c|c|c}
+	\label{tab:KMM2}\\
+	\hline
+	\diagbox{classifier}{testing accuracy}{kernel type} & linear & RBF \\
+	\hline
+	$SVM\_lin$ &0.6004&0.5143\\
+	\hline
+	$SVM\_RBF(C=1)$ &0.5974 &0.6518\\
+	\hline
+	$SVM\_RBF(C=5)$ &0.5116&0.6518\\
+	\hline
+	\end{tabular} 
+%\end{tiny}
+\end{table}
+
+\begin{table}[h]
+%\begin{tiny}
+\centering
+	\caption{KMM experiments on $P2R$}
+	\begin{tabular}{c|c|c}
+	\label{tab:KMM3}\\
+	\hline
+	\diagbox{classifier}{testing accuracy}{kernel type} & linear & RBF \\
+	\hline
+	$SVM\_lin$ &0.6876&0.6927\\
+	\hline
+	$SVM\_RBF(C=1)$ &0.6617 &0.7299\\
+	\hline
+	$SVM\_RBF(C=5)$ &0.6633&0.7273\\
+	\hline
+	\end{tabular} 
+%\end{tiny}
+\end{table}
+
+From Table~\ref{tab:KMM1}, Table~\ref{tab:KMM2} and Table~\ref{tab:KMM3} we can find when  KMM uses linear kernel, $SVM\_lin$ performs better than $SVM\_RBF$. When KMM uses RBF kernel, the case is the contrary. We conclude that the kernel method used in KMM and the kernel method used in SVM should be consistent.
+
+\subsubsection{JDA Experiments}
+In this part we will show performances of JDA with different dimensions after transfer. In this experiment, we use $SVM_RBF$ as classifier and the hyper-parameter $C$ of SVM is 1.
+\begin{table}[h]
+\begin{tiny}
+\centering
+	\caption{JDA experiments}
+	\begin{tabular}{c|c|c|c|c|c|c|c}
+	\label{tab:JDA}\\
+	\hline
+	\diagbox{Src\&Tar}{testing accuracy}{dim} & 32 & 64 & 128 & 256 & 512 &1024 &2048 \\
+	\hline
+	$A2R$ &0.7092&0.7462&0.7530&0.7471&0.7464&0.7464&0.7457\\
+	\hline
+	$C2R$ &0.6543&0.6638&0.6656&0.6628&0.6601&0.6605&0.6608\\
+	\hline
+	$P2R$ &0.7351&0.7459&0.7436&0.7471&0.7482&0.7478&0.7478\\
+	\hline
+	\end{tabular} 
+\end{tiny}
+\end{table}
+Similar to the results of TCA, with the increase of dimensions, the testing accuracy initially increase and then reach the highest point. Finally the testing accuracy stay stable. This similarity can be explained by the fact that TCA and JDA both use Maximum Mean
+Discrepancy (MMD) to measure the difference between the distribution of source domain and the distribution of target domain.
+\subsection{DaNN Experiments}
+We will present five parts of experiments in this section to evaluate the influence of different parameter in this model. Since DaNN is rather a simple neural network with only 1 hidden layer for domain adaptation, there are not many details of building this network. In the all five parts of experiments, we set $Learning\_rate = 0.05$, $Epochs = 30$. For each combination of source domain and target domain, we use the data in source domain to be the training set and the data in target domain to be the testing set. Besides, in this section we use $\lambda$ to denote the coefficient of mmd\_loss in the calculation of total loss, $DR$ to denote the drop rate and $BS$ to denote the batch size.
+
+For the first part, we show the change of training accuracy, testing accuracy, training loss and testing loss during the running process of this network. All values of the loss curves are scaled to interval $[0.0, 1.0]$ for a better observation. For this part, we have set $\lambda = 1$, $DR = 0.5$, $BS = 64$. The combination of target domain and source domain we choose is $P2R$. Figure~\ref{fig:DaNN1} shows the result.
+\begin{figure}[!h]
+    \centerline{\includegraphics[scale=0.4]{HDaNN/DaNN_fig1.png}}
+    \caption{DaNN: part 1}
+    \label{fig:DaNN1}
+\end{figure}
+
+From figure~\ref{fig:DaNN1} we can find both training accuracy and testing accuracy have a quick convergence. However, there exists a problem that though training accuracy and training loss have a nice trend, the testing accuracy stay stable at about 70\% and the testing loss stay at a high level. In fact, the result is only a little better than the result of scenario without domain adaptation method.
+
+For the second part, we focus on different combination of source domain and target domain. We set $\lambda = 1$, $DR = 0.5$, $BS = 64$ in this part and figure~\ref{fig:DaNN2} shows the result.
+\begin{figure}[!h]
+    \centerline{\includegraphics[scale=0.4]{HDaNN/DaNN_fig2.png}}
+    \caption{DaNN: part 2}
+    \label{fig:DaNN2}
+\end{figure}
+
+From figure~\ref{fig:DaNN2} we notice that $A2R$ converge more slowly than $C2R$ and $P2R$ but it can reach the highest testing accuracy. The accuracy of $P2R$ is slightly lower than $A2R$ while the testing accuracy of $C2R$ is much lower. The result is consistent with the results of most traditional methods and the situation without domain adaptation method.
+
+Then we begin to evaluate the influence of some parameters of this model.
+
+The third part is about parameter $\lambda$. $\lambda$ in this model means the coefficient of mmd\_loss in the calculation of total loss which theoretically can change the optimized direction. In this part we set $DR = 0.5$, $BS = 64$ and choose $A2R$ be the combination of source domain and target domain. Figure~\ref{fig:DaNN3} shows the result.
+\begin{figure}[!h]
+    \centerline{\includegraphics[scale=0.4]{HDaNN/DaNN_fig3.png}}
+    \caption{DaNN: part 3}
+    \label{fig:DaNN3}
+\end{figure}
+
+Something strange happens in figure~\ref{fig:DaNN3}. Almost all the curves are coincident with others, which means that parameter $\lambda$ does not play a key role in DaNN model. But there must be some other reason. We think it is because DaNN is used to deal with images but we change it to deal with deep learning feature. This change may make $\lambda$ useless.
+
+The fourth part is about parameter $BS$. $BS$ means the batch size of every training batch. In this part we set $DR = 0.5$, $\lambda = 1$ and choose $A2R$ be the combination of source domain and target domain. Figure~\ref{fig:DaNN4} shows the result.
+
+\begin{figure}[!h]
+    \centerline{\includegraphics[scale=0.4]{HDaNN/DaNN_fig4.png}}
+    \caption{DaNN: part 4}
+    \label{fig:DaNN4}
+\end{figure}
+
+From figure~\ref{fig:DaNN4} we can easily find that a small batch size is better than a big batch size in this experiment. A smaller batch size can converge more quickly and when batch size is too big, its testing accuracy can not get as high as a small batch size.
+
+The fifth part is about parameter $DR$. $DR$ means drop rate, which is used to deactivate neuron and suppress overfitting.  In this part we set $BS = 64$, $\lambda = 1$ and choose $A2R$ be the combination of source domain and target domain. Figure~\ref{fig:DaNN5} shows the result.
+\begin{figure}[!h]
+    \centerline{\includegraphics[scale=0.4]{HDaNN/DaNN_fig5.png}}
+    \caption{DaNN: part 5}
+    \label{fig:DaNN5}
+\end{figure}
+
+From figure~\ref{fig:DaNN5} we find when $DS <= 0.8$, there is almost no difference. When $DS = 0.9$, the accuracy begin to flop. And when $Ds>=0.99$, the accuracy is close to 0. It is because when drop rate is too high, most neurons are deactivated and there are not enough information to be output. 
 \subsection{ADDA Experiments}
 We will present six experiments in this part. We use fully connected networks (FCNs) to construct the four subnetworks. First we show some common parameters of all of these experiments in table \ref{tab:SymADDA}. We split both $X_s$ and $X_t$ into training set, $X^{tr}_s$ and $X^{tr}_t$, and test set, $X^{te}_s$ and $X^{te}_t$. $X^{tr}_s$ is used to train ADDA the first stage and $X^{te}_s$ is used to select the best parameters of $M_s$ and $C$ correspondingly, preventing overfitting. $X^{te}_t$ is used to train ADDA the second stage and $X^{te}_t$ is used to select the best parameters of $M_t$ and $D$ correspondingly, also preventing overfitting. It should be mentioned that both $X^{te}_t$ and $X^{tr}_t$ are unlabeled.
  \begin{table}[h]
@@ -397,18 +722,15 @@ Conclusions.
 
 \section*{References}
 
-Please number citations consecutively within brackets \cite{b1}. The
-sentence punctuation follows the bracket \cite{b2}.
-
 \begin{thebibliography}{00}
 \bibitem{ADDA1} Eric Tzeng, Judy Hoffman, Kate Saenko and Trevor Darrel, ``Adversarial Discriminative Domain Adaptation''.
 \bibitem{DANN1} Yaroslav Ganin, Evgeniya Ustinova, Hana Ajakan, Pascal Germain, Hugo Larochelle, Francois Laviolette,
     Mario Marchand, Victor Lempitsky, ``Domain-Adversarial Training of Neural Networks''.
 \bibitem{BN1} Sergey Ioffe, Christian Szegedy, ``Batch Normalization: Accelerating Deep Network Training by Reducing Internal Covariate Shift''.
-    
+\bibitem{TCA} Pan, Sinno Jialin, et al. "Domain adaptation via transfer component analysis." IEEE Transactions on Neural Networks 22.2 (2010): 199-210.
+\bibitem{CORAL} Sun, Baochen, Jiashi Feng, and Kate Saenko. "Return of frustratingly easy domain adaptation." Thirtieth AAAI Conference on Artificial Intelligence. 2016.
+\bibitem{KMM} Huang, Jiayuan, et al. "Correcting sample selection bias by unlabeled data." Advances in neural information processing systems. 2007.
+\bibitem{JDA} Long, Mingsheng, et al. "Transfer feature learning with joint distribution adaptation." Proceedings of the IEEE international conference on computer vision. 2013. 
+\bibitem{DaNN} Ghifary, Muhammad, W. Bastiaan Kleijn, and Mengjie Zhang. "Domain adaptive neural networks for object recognition." Pacific Rim international conference on artificial intelligence. Springer, Cham, 2014.  
 \end{thebibliography}
-\vspace{12pt}
-\color{red}
-IEEE conference templates contain guidance text for composing and formatting
-
 \end{document}

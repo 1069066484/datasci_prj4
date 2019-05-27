@@ -5,7 +5,7 @@ Created on Sun May 19 09:49:33 2019
 @author: 12709
 """
 
-import HDaNN
+import HDaNN as DaNN
 import numpy as np
 import torch
 import torch.nn as nn
@@ -18,7 +18,7 @@ import Ldata_helper as data_helper
 from sklearn import preprocessing
 
 #import data_loader
-import Hmmd
+import Hmmd as mmd
 
 global scaler
 
@@ -30,12 +30,12 @@ L2_WEIGHT = 0.003
 DROPOUT = 0.5
 N_EPOCH = 30
 BATCH_SIZE = [64, 64]
-LAMBDA = 1
+LAMBDA = 10000
 GAMMA = 10 ^ 3
 RESULT_TRAIN = []
 RESULT_TEST = []
-log_train = open('train_l1_bs64_dr0.5_lin.txt', 'w')
-log_test = open('test_l1_bs64_dr0.5_lin.txt', 'w')
+log_train = open('train_l10000_bs64_dr0.5_lin.txt', 'w')
+log_test = open('test_l10000_bs64_dr0.5_lin.txt', 'w')
 
 
 class MyTrainData_src(Dataset):
@@ -151,7 +151,7 @@ def test(model, data_tar, e):
 if __name__ == '__main__':
     #rootdir = '../../../data/office_caltech_10/'
     torch.manual_seed(1)
-    i = 2
+    i = 0
     data_src = DataLoader(dataset = MyTrainData_src(i),batch_size=BATCH_SIZE[0],shuffle=True, drop_last= True)
     data_tar = DataLoader(dataset = MyTrainData_tar(i),batch_size=BATCH_SIZE[1],shuffle=True, drop_last= True)
     '''
