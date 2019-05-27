@@ -436,7 +436,7 @@ The third part is about parameter $\lambda$. $\lambda$ in this model means the c
     \label{fig:DaNN3}
 \end{figure}
 
-Something strange happens in figure~\ref{fig:DaNN3}. Almost all the curves are coincident with others, which means that parameter $\lambda$ does not play a key role in DaNN model. But there must be some other reason. We think it is because DaNN is used to deal with images but we change it to deal with deep learning feature. This change may make $\lambda$ useless.
+Something strange happens in figure~\ref{fig:DaNN3}. Almost all the curves are coincident with others, which means that parameter $\lambda$ does not play a key role in DaNN model. But there must be some other reason. We think it is because DaNN is used to deal with raw image pixels or SURF features but we change it to deal with deep learning features. This change may make $\lambda$ useless.
 
 The fourth part is about parameter $BS$. $BS$ means the batch size of every training batch. In this part we set $DR = 0.5$, $\lambda = 1$ and choose $A2R$ be the combination of source domain and target domain. Figure~\ref{fig:DaNN4} shows the result.
 
@@ -697,6 +697,22 @@ Unlike ADDA, the power of $D$ doesn't improve so smoothly. We think it is becaus
 \end{figure*}
 
 \section{Discussions}
+\subsection{Theory of Maximum Mean Discrepancy}
+For TCA, JDA and DaNN, we find that they all use the Maximum Mean Discrepancy(MMD) measure as a tool to reduce the distribution mismatch between the source and target domains in the latent space. MMD can be explained as a statistic which means the difference between the mean function values on two samples drawn for two distributions $p$ and $q$ respectively. When MMD is large, the $p$ and $q$ are likely different.
+
+Let $p$ and $q$ be distributions defined on a domain $\mathcal{X}$. Given observations $X := \left\{x_{1}, \dots, x_{m}\right\}$ and $Y :=\left\{y_{1}, \dots, y_{n}\right\}$. And let $\mathfrak{F}$ be a class of functions $f : x \rightarrow \mathbb{R}$. Then we can define the maximum mean discrepancy(MMD) and its empirical estimate as:
+\begin{equation}
+\operatorname{MMD}[\mathcal{F}, p, q] :=\sup _{f \in \mathcal{F}}\left(\mathbf{E}_{x \sim p}[f(x)]-\mathbf{E}_{y \sim q}[f(y)]\right)
+\end{equation}
+\begin{equation}
+\operatorname{MMD}[\mathcal{F}, X, Y] :=\sup _{f \in \mathcal{F}}\left(\frac{1}{m} \sum_{i=1}^{m} f\left(x_{i}\right)-\frac{1}{n} \sum_{i=1}^{n} f\left(y_{i}\right)\right)
+\end{equation}
+
+Take RKHS into consideration, we can get a new empirical of MMD:
+\begin{equation}
+\operatorname{MMD}[\mathcal{F}, X, Y]=\left[\frac{1}{m^{2}} \sum_{i, j=1}^{m} k\left(x_{i}, x_{j}\right)-\frac{2}{m n} \sum_{i, j=1}^{m, n} k\left(x_{i}, y_{j}\right)+\frac{1}{n^{2}} \sum_{i, j=1}^{n} k\left(y_{i}, y_{j}\right)\right]^{\frac{1}{2}}
+\end{equation}
+This form is more easily to do computation and most domain adaptation methods use this form to calculate MMD.
 \subsection{Problems of Network Design}
 No matter which deep model we applied, severe overfitting occurs when training the classifier. Take ADDA for example, $Ac(M_s(X^{tr}_s))$ are always greater than $Ac(M_s(X^{te}_s))$ by about 0.15. We tried dropping out some neurons and increases L2 regularization constraint, but these measures do not ease overfitting but brings negative effects on $Ac(M_s(X^{te}_s))$.
 
