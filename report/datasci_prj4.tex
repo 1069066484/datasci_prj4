@@ -218,7 +218,7 @@ First of all, in Table~\ref{tab:RAW}, we will show the test accuracy of some cla
 	\label{tab:RAW}
 	\begin{tabular}{cccccc}
 		\hline
-		Src &Tar&KNN&SVM(linear)&SVM(RBF,C=1)&SVM(RBF,C=5) \\
+		Src &Tar&1NN&SVM(linear)&SVM(RBF,C=1)&SVM(RBF,C=5) \\
 		\hline
 		\hline
         $Art$ & $Real$ & 0.6580 & 0.7310 & 0.7436 & 0.7473 \\
@@ -356,7 +356,7 @@ As Baochen Sun, et al. has pointed in \cite{CORAL}, CORAL is a "frustratingly ea
 	\begin{tabular}{c|c|c|c|c}
 	\label{tab:CORAL}\\
 	\hline
-	\diagbox{Src\&Tar}{testing accuracy}{classifier} & KNN & SVM\_lin & SVM\_RBF(C=1) & SVM\_RBF(C=5) \\
+	\diagbox{Src\&Tar}{testing accuracy}{classifier} & 1NN & SVM\_lin & SVM\_RBF(C=1) & SVM\_RBF(C=5) \\
 	\hline
 	$A2R$ &0.6488&0.7090&0.7390&0.7450\\
 	\hline
@@ -689,7 +689,7 @@ Unlike ADDA, the ability of $D$ doesn't improve so smoothly and the final discri
 \end{figure*}
 
 \subsection{Summary of Results}
-In this part, we present a summary of accuracies using different approaches for comparison, as illustrated in table \ref{tab:ex_sum}. All of the accuracies are the best achieved with the indicated approach, no matter what configuration of hyper-parameters is. Baselines are provided. "Baseline-Deep" indicates the accuracies achieved using classification network trained only with source domain samples to classify target domain samples. Both test and training accuracies are provided if $X_t$ is splited so. Actually, we only did so in ADDA and DANN's experiments and take all $X_t$ for training of other domain adaptation models. It is not always necessary to split $X_t$ into training and test set since domain adaptation is usually assuming $X_t$ as the test set that is subject to a distribution different from $X_s$. Therefore, it should be use training accuracies of ADDA and DANN, $M_t(X^{tr}_t)$, for comparison.
+In this part, we present a summary of accuracies using different approaches for comparison, as illustrated in table \ref{tab:ex_sum}(Recall that 1NN stands for KNN with $K=1$). All of the accuracies are the best achieved with the indicated approach, no matter what configuration of hyper-parameters is. Baselines are provided. "Baseline-Deep" indicates the accuracies achieved using classification network trained only with source domain samples to classify target domain samples. Both test and training accuracies are provided if $X_t$ is splited so. Actually, we only did so in ADDA and DANN's experiments and take all $X_t$ for training of other domain adaptation models. It is not always necessary to split $X_t$ into training and test set since domain adaptation is usually assuming $X_t$ as the test set that is subject to a distribution different from $X_s$. Therefore, it should be use training accuracies of ADDA and DANN, $M_t(X^{tr}_t)$, for comparison.
 
 Headers, A2R, C2R and P2R of table \ref{tab:ex_sum}, indicate we transfer respectively from Art, Clipboard and Product domain into RealWorld domain. Compared with baselines, we can decide TCA, JDA and ADDA do well in domain adaptation, improving the accuracies by at least 0.01 in all of the three tasks. On the contrary, CORAL, KMM do not perform so well. And it should be noticed that ADDA outperforms all other methods in general.
  \begin{table}[h]
@@ -702,7 +702,7 @@ Headers, A2R, C2R and P2R of table \ref{tab:ex_sum}, indicate we transfer respec
 		\hline
 		\hline
 		Baseline-SVM &  0.7473 & 0.6511 & 0.7296 \\
-        Baseline-KNN &  0.6580 & 0.5864 & 0.6957 \\
+        Baseline-1NN &  0.6580 & 0.5864 & 0.6957 \\
         Baseline-Deep &  0.7313 & 0.6561 & 0.7313 \\
 		TCA &  0.7604 & 0.6693* & 0.7429 \\
 		CORAL &  0.7450 &  0.6514 & 0.7310 \\
@@ -777,13 +777,13 @@ To our disappointment, compared with baselines, these methods of domain adaptati
 
 It is a fact that no matter which method is used, for given source and target domain, whether A2R, C2R or P2R, the resulted classification performances on target data do not differ that much. This is likely to be limited by correlation of the two domains. In other words, uncorrelation of the source and target domains also brings difficulties for work of domain adaptation.
 
-\section*{References}
+%\section*{References}
 
-\begin{thebibliography}{00}
-\bibitem{ADDA1} Eric Tzeng, Judy Hoffman, Kate Saenko and Trevor Darrel, ``Adversarial Discriminative Domain Adaptation''.
+\begin{thebibliography}{99}
+\bibitem{ADDA1} Eric Tzeng, Judy Hoffman, Kate Saenko and Trevor Darrel, ``Adversarial Discriminative Domain Adaptation''. arXiv preprint, arXiv:1702.05464, 2017.
 \bibitem{DANN1} Yaroslav Ganin, Evgeniya Ustinova, Hana Ajakan, Pascal Germain, Hugo Larochelle, Francois Laviolette,
-    Mario Marchand, Victor Lempitsky, ``Domain-Adversarial Training of Neural Networks''.
-\bibitem{BN1} Sergey Ioffe, Christian Szegedy, ``Batch Normalization: Accelerating Deep Network Training by Reducing Internal Covariate Shift''.
+    Mario Marchand, Victor Lempitsky, ``Domain-Adversarial Training of Neural Networks''. may 2015. URL https://arxiv.org/abs/1505.07818.
+\bibitem{BN1} Sergey Ioffe, Christian Szegedy, ``Batch Normalization: Accelerating Deep Network Training by Reducing Internal Covariate Shift''.  arXiv preprint, arXiv:1502.03167, 2015.
 \bibitem{TCA} Pan, Sinno Jialin, et al. "Domain adaptation via transfer component analysis." IEEE Transactions on Neural Networks 22.2 (2010): 199-210.
 \bibitem{CORAL} Sun, Baochen, Jiashi Feng, and Kate Saenko. "Return of frustratingly easy domain adaptation." Thirtieth AAAI Conference on Artificial Intelligence. 2016.
 \bibitem{KMM} Huang, Jiayuan, et al. "Correcting sample selection bias by unlabeled data." Advances in neural information processing systems. 2007.
